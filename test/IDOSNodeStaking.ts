@@ -1,0 +1,460 @@
+import { expect } from "chai";
+import { network } from "hardhat";
+import { Duration, evmTimestamp } from "./utils/time"
+
+const { ethers, networkHelpers } = await network.connect();
+
+const accounts = await ethers.getSigners();
+const [owner, user1, user2, user3, node1, node2, node3] = accounts;
+
+const ZERO_ADDR = ethers.ZeroAddress;
+const ZERO_ACCT = { address: ZERO_ADDR };
+
+describe("IDOSNodeStaking", () => {
+  let idosToken, idosStaking;
+
+  const stake = (user, node, amount) =>
+    idosStaking.connect(user).stake(ZERO_ADDR, node.address, amount);
+
+  const unstake = (user, node, amount) =>
+    idosStaking.connect(user).unstake(node.address, amount);
+
+  const slash = (node) =>
+    idosStaking.slash(node);
+
+  const stakeByNodeByUser = (user, node) =>
+    idosStaking.stakeByNodeByUser(user.address, node.address);
+
+  const getNodeStake = (node) =>
+    idosStaking.getNodeStake(node.address);
+
+  const getUserStake = (user) =>
+    idosStaking.getUserStake(user.address);
+
+  const withdrawableReward = (user) =>
+    idosStaking.withdrawableReward(user.address);
+
+  const setup = async () => {
+    idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+
+    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11)]);
+
+    await idosToken.transfer(idosStaking, 10000);
+
+    const idosStakingAddress = await idosStaking.getAddress();
+    for (let user of [user1, user2, user3]) {
+      await idosToken.transfer(user, 1000);
+      await idosToken.connect(user).approve(idosStakingAddress, 1000);
+    }
+    return { idosToken, idosStaking };
+  };
+
+  beforeEach(async () => {
+    ({ idosToken, idosStaking } = await networkHelpers.loadFixture(setup));
+  });
+
+  describe("Pausing", () => {
+    describe("When not paused", () => {
+      it("Can be paused only by owner", async () => {
+        await expect(idosStaking.pause())
+          .to.not.revert(ethers);
+
+        await expect(idosStaking.connect(user1).pause())
+          .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+      });
+    });
+
+    describe("When paused", () => {
+      beforeEach(async () => {
+        await idosStaking.pause();
+      });
+
+      it("Can be unpaused by owner", async () => {
+        await expect(idosStaking.unpause()).to.not.revert(ethers);
+      });
+
+      it("Can't allowNode", async () => {
+        await expect(idosStaking.allowNode(node1))
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't disallowNode", async () => {
+        await expect(idosStaking.disallowNode(node1))
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't stake", async () => {
+        await expect(stake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't unstake", async () => {
+        await expect(unstake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't withdrawUnstaked", async () => {
+        await expect(idosStaking.connect(user1).withdrawUnstaked())
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't withdrawSlashedStakes", async () => {
+        await expect(idosStaking.withdrawSlashedStakes())
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+
+      it("Can't withdrawReward", async () => {
+        await expect(idosStaking.withdrawReward(user1))
+          .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
+      });
+    });
+  });
+
+  describe("Allowlisting", () => {
+    it("Node can be allowed only by owner", async () => {
+      await expect(idosStaking.allowNode(node1)).to.not.revert(ethers);
+
+      await expect(idosStaking.connect(user1).allowNode(node1))
+        .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+    });
+
+    it("Node can be disallowed only by owner", async () => {
+      await expect(idosStaking.disallowNode(node1)).to.not.revert(ethers);
+
+      await expect(idosStaking.connect(user1).disallowNode(node1))
+        .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+    });
+
+    it("Emits events", async () => {
+      await expect(idosStaking.allowNode(node1))
+        .to.emit(idosStaking, "Allowed").withArgs(node1.address);
+
+      await expect(idosStaking.disallowNode(node2))
+        .to.emit(idosStaking, "Disallowed").withArgs(node2.address);
+    });
+  });
+
+  describe("Staking", () => {
+    describe("Before starting", () => {
+      it("Can't stake yet", async () => {
+        await expect(stake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "NotStarted");
+      });
+    });
+
+    describe("After starting", () => {
+      beforeEach(async () => {
+        await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+      });
+
+      it("Epochs last 1 day", async () => {
+        expect(await idosStaking.EPOCH_LENGTH()).to.equal(Duration.days(1));
+
+        for (let i = 0; i < 100; i++) {
+          expect(await idosStaking.currentEpoch()).to.equal(i);
+          await networkHelpers.time.increase(Duration.days(1));
+        }
+      });
+
+      it("Can't stake against zero address", async () => {
+        await expect(stake(user1, ZERO_ACCT, 100))
+          .to.be.revertedWithCustomError(idosStaking, "ZeroAddressNode");
+      });
+
+      it("Can't stake against slashed node", async () => {
+        await stake(user1, node1, 1);
+        await slash(node1);
+
+        await expect(stake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "NodeIsSlashed");
+      });
+
+      it("Can only stake positive amounts", async () => {
+        await expect(stake(user1, node1, 0))
+          .to.be.revertedWithCustomError(idosStaking, "AmountNotPositive")
+          .withArgs(0);
+      });
+
+      it("Emits events", async () => {
+        await expect(stake(user1, node1, 100))
+          .to.emit(idosStaking, "Staked")
+          .withArgs(user1.address, node1.address, 100);
+      });
+
+      it("Works", async () => {
+        await stake(user1, node1, 100);
+
+        expect(await stakeByNodeByUser(user1, node1)).to.equal(100);
+        expect(await getNodeStake(node1)).to.equal(100);
+        expect((await getUserStake(user1)).activeStake).to.equal(100);
+        expect(await idosToken.balanceOf(user1)).to.equal(900);
+        expect(await idosToken.balanceOf(idosStaking)).to.equal(10100);
+
+        await stake(user1, node1, 100);
+
+        expect(await stakeByNodeByUser(user1, node1)).to.equal(200);
+        expect(await getNodeStake(node1)).to.equal(200);
+        expect((await getUserStake(user1)).activeStake).to.equal(200);
+        expect(await idosToken.balanceOf(user1)).to.equal(800);
+        expect(await idosToken.balanceOf(idosStaking)).to.equal(10200);
+
+        await stake(user1, node2, 100);
+
+        expect(await stakeByNodeByUser(user1, node2)).to.equal(100);
+        expect(await getNodeStake(node2)).to.equal(100);
+        expect((await getUserStake(user1)).activeStake).to.equal(300);
+        expect(await idosToken.balanceOf(user1)).to.equal(700);
+        expect(await idosToken.balanceOf(idosStaking)).to.equal(10300);
+
+        await stake(user2, node2, 100);
+
+        expect(await stakeByNodeByUser(user2, node2)).to.equal(100);
+        expect(await getNodeStake(node2)).to.equal(200);
+        expect((await getUserStake(user2)).activeStake).to.equal(100);
+        expect(await idosToken.balanceOf(user2)).to.equal(900);
+        expect(await idosToken.balanceOf(idosStaking)).to.equal(10400);
+      });
+    });
+  });
+
+  describe("Unstaking", () => {
+    describe("Before starting", () => {
+      it("Can't unstake yet", async () => {
+        await expect(unstake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "NotStarted");
+      });
+    });
+
+    describe("After starting", () => {
+      beforeEach(async () => {
+        await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+        await stake(user1, node1, 100);
+      });
+
+      it("Can't unstake from zero address", async () => {
+        await expect(unstake(user1, ZERO_ACCT, 100))
+          .to.be.revertedWithCustomError(idosStaking, "ZeroAddressNode");
+      });
+
+      it("Can't unstake from slashed node", async () => {
+        await slash(node1);
+
+        await expect(unstake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "NodeIsSlashed");
+      });
+
+      it("Can only unstake positive amounts", async () => {
+        await expect(unstake(user1, node1, 0))
+          .to.be.revertedWithCustomError(idosStaking, "AmountNotPositive")
+          .withArgs(0);
+      });
+
+      it("Can only unstake up to staked amount", async () => {
+        await expect(unstake(user1, node1, 1000))
+          .to.be.revertedWithCustomError(idosStaking, "AmountExceedsStake")
+          .withArgs(1000, 100);
+
+        expect(await stakeByNodeByUser(user1, node1)).to.equal(100);
+
+        await stake(user1, node1, 900);
+
+        await expect(unstake(user1, node1, 1000)).to.not.revert(ethers);
+
+        expect(await stakeByNodeByUser(user1, node1)).to.equal(0);
+      });
+
+      it("Emits events", async () => {
+        await stake(user1, node1, 100);
+
+        await expect(unstake(user1, node1, 100))
+          .to.emit(idosStaking, "Unstaked")
+          .withArgs(user1.address, node1.address, 100);
+      });
+
+      it("Works", async () => {
+        await unstake(user1, node1, 10);
+
+        expect(await stakeByNodeByUser(user1, node1)).to.equal(90);
+      });
+
+      describe("Withdrawal", () => {
+        it("Can't withdraw before delay", async () => {
+          await unstake(user1, node1, 10);
+
+          await expect(idosStaking.connect(user1).withdrawUnstaked())
+            .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableStake");
+        });
+
+        it("Emits events", async () => {
+          await unstake(user1, node1, 100);
+
+          await networkHelpers.time.increase(Duration.days(14));
+
+          await expect(idosStaking.connect(user1).withdrawUnstaked())
+            .to.emit(idosStaking, "UnstakedWithdraw")
+            .withArgs(user1.address, 100);
+        });
+
+        it("Works", async () => {
+          await unstake(user1, node1, 10);
+
+          await networkHelpers.time.increase(Duration.days(1));
+
+          await unstake(user1, node1, 10);
+
+          await networkHelpers.time.increase(Duration.days(13));
+
+          await idosStaking.connect(user1).withdrawUnstaked();
+
+          expect(await idosToken.balanceOf(user1)).to.equal(910);
+
+          await networkHelpers.time.increase(Duration.days(1));
+
+          await idosStaking.connect(user1).withdrawUnstaked();
+
+          expect(await idosToken.balanceOf(user1)).to.equal(920);
+        });
+      });
+    });
+  });
+
+  describe("Slashing", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+    });
+
+    it("Unknown nodes can't be slashed", async () => {
+      await expect(idosStaking.slash(node1.address))
+        .to.be.revertedWithCustomError(idosStaking, "NodeIsUnknown")
+        .withArgs(node1.address);
+
+      const randomAddress = ethers.Wallet.createRandom().address;
+
+      await expect(idosStaking.slash(randomAddress))
+        .to.be.revertedWithCustomError(idosStaking, "NodeIsUnknown")
+        .withArgs(randomAddress);
+    });
+
+    it("Known nodes can be slashed only by owner", async () => {
+      await stake(user1, node1, 100);
+
+      await expect(idosStaking.slash(node1.address)).to.not.revert(ethers);
+
+      await expect(idosStaking.connect(user1).slash(node1.address))
+        .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+    });
+
+    describe("Withdrawing slashed stakes", () => {
+      beforeEach(async () => {
+        await stake(user1, node1, 100);
+        await idosStaking.slash(node1);
+      });
+
+      it("Can be done only by owner", async () => {
+        await expect(idosStaking.withdrawSlashedStakes()).to.not.revert(ethers);
+
+        await expect(idosStaking.connect(user1).withdrawSlashedStakes())
+          .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+      });
+
+      it("Emits events", async () => {
+        await expect(idosStaking.withdrawSlashedStakes())
+          .to.emit(idosStaking, "SlashedWithdraw").withArgs(100);
+      });
+
+      it("Works", async () => {
+        const prevBalance = await idosToken.balanceOf(owner);
+
+        await idosStaking.withdrawSlashedStakes();
+
+        expect(await idosToken.balanceOf(owner)).to.equal(prevBalance + 100n);
+
+        await expect(idosStaking.withdrawSlashedStakes())
+          .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableSlashedStakes");
+      });
+    });
+  });
+
+  describe("Rewards", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+    });
+
+    // TODO prevents sniping: first staker in epoch
+    // could otherwise immediately withdraw all rewards
+    it("Count only past epochs", async () => {
+      await stake(user1, node1, 100);
+      expect(await withdrawableReward(user1)).to.equal(0);
+    });
+
+    it("Ignore slashed stakes", async () => {
+      await stake(user1, node1, 50);
+      await stake(user1, node2, 50);
+      await stake(user2, node2, 300);
+      await idosStaking.slash(node1);
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(14);
+      expect(await withdrawableReward(user2)).to.equal(85);
+    });
+
+    it("Works I", async () => {
+      await stake(user1, node1, 100);
+      await stake(user2, node1, 300);
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(25);
+      await idosStaking.connect(user1).withdrawReward();
+      expect(await idosToken.balanceOf(user1)).to.equal(1000-100+25);
+
+      expect(await withdrawableReward(user2)).to.equal(75);
+      await idosStaking.connect(user2).withdrawReward();
+      expect(await idosToken.balanceOf(user2)).to.equal(1000-300+75);
+
+      await expect(idosStaking.connect(user1).withdrawReward())
+        .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableRewards");
+    });
+
+    it("Works II", async () => {
+      await stake(user1, node1, 50);
+      await stake(user1, node2, 50);
+      await stake(user2, node2, 300);
+
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(25);
+      expect(await withdrawableReward(user2)).to.equal(75);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await networkHelpers.time.increase(Duration.days(9));
+
+      expect(await withdrawableReward(user1)).to.equal(250);
+      expect(await withdrawableReward(user2)).to.equal(750);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await idosStaking.slash(node2);
+
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(350);
+      expect(await withdrawableReward(user2)).to.equal(750);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await networkHelpers.time.increase(Duration.days(10));
+
+      expect(await withdrawableReward(user1)).to.equal(1350);
+      expect(await withdrawableReward(user2)).to.equal(750);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await stake(user2, node1, 100);
+      await stake(user3, node1, 100);
+      await stake(user3, node3, 200);
+
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(1361);
+      expect(await withdrawableReward(user2)).to.equal(772);
+      expect(await withdrawableReward(user3)).to.equal(66);
+    });
+  });
+});
