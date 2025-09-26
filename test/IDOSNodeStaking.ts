@@ -380,10 +380,11 @@ describe("IDOSNodeStaking", () => {
       await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
     });
 
-    // TODO prevents sniping: first staker in epoch
+    // Ensure sniping prevention: first staker in epoch
     // could otherwise immediately withdraw all rewards
     it("Count only past epochs", async () => {
       await stake(user1, node1, 100);
+
       expect(await withdrawableReward(user1)).to.equal(0);
     });
 
@@ -455,6 +456,43 @@ describe("IDOSNodeStaking", () => {
       expect(await withdrawableReward(user1)).to.equal(1361);
       expect(await withdrawableReward(user2)).to.equal(772);
       expect(await withdrawableReward(user3)).to.equal(66);
+    });
+
+    it("Works III", async () => {
+      await stake(user1, node1, 50);
+      await stake(user1, node2, 50);
+      await stake(user2, node2, 300);
+
+      await networkHelpers.time.increase(Duration.days(10));
+
+      expect(await withdrawableReward(user1)).to.equal(250);
+      expect(await withdrawableReward(user2)).to.equal(750);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await stake(user3, node1, 100);
+      await unstake(user1, node2, 50);
+
+      await idosStaking.connect(user1).withdrawReward()
+
+      expect(await withdrawableReward(user1)).to.equal(0);
+      expect(await withdrawableReward(user2)).to.equal(750);
+      expect(await withdrawableReward(user3)).to.equal(0);
+
+      await networkHelpers.time.increase(Duration.days(10));
+
+      expect(await withdrawableReward(user1)).to.equal(110);
+      expect(await withdrawableReward(user2)).to.equal(1410);
+      expect(await withdrawableReward(user3)).to.equal(220);
+
+      await networkHelpers.time.increase(Duration.days(5));
+
+      await idosStaking.connect(user1).withdrawUnstaked();
+
+      await networkHelpers.time.increase(Duration.days(5));
+
+      expect(await withdrawableReward(user1)).to.equal(220);
+      expect(await withdrawableReward(user2)).to.equal(2070);
+      expect(await withdrawableReward(user3)).to.equal(440);
     });
   });
 });
