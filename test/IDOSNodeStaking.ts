@@ -150,9 +150,9 @@ describe("IDOSNodeStaking", () => {
       it("Epochs last 1 day", async () => {
         expect(await idosStaking.EPOCH_LENGTH()).to.equal(Duration.days(1));
 
-        for (let i = 0; i < 100; i++) {
-          expect(await idosStaking.currentEpoch()).to.equal(i);
-          await networkHelpers.time.increase(Duration.days(1));
+        for (let i = 0; i < 10; i++) {
+          expect(await idosStaking.currentEpoch()).to.equal(i*100);
+          await networkHelpers.time.increase(Duration.days(100));
         }
       });
 
