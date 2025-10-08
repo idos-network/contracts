@@ -37,7 +37,7 @@ describe("IDOSNodeStaking", () => {
   const setup = async () => {
     idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
 
-    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11)]);
+    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11), 100]);
 
     await idosToken.transfer(idosStaking, 10000);
 
@@ -397,6 +397,36 @@ describe("IDOSNodeStaking", () => {
 
       expect(await withdrawableReward(user1)).to.equal(14);
       expect(await withdrawableReward(user2)).to.equal(85);
+    });
+
+    it("changes value according to the epoch reward", async () => {
+      await stake(user1, node1, 100);
+      // Set to 100 at constructor
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(100);
+      await idosStaking.connect(user1).withdrawReward();
+      expect(await idosToken.balanceOf(user1)).to.equal(1000-100+100);
+
+      await idosStaking.setEpochReward(200);
+      await networkHelpers.time.increase(Duration.days(1));
+      expect(await withdrawableReward(user1)).to.equal(200);
+    });
+
+    it("changes value according to the epoch reward and keeps track of past epoch rewards", async () => {
+      await stake(user1, node1, 100);
+      // Set to 100 at constructor
+      await networkHelpers.time.increase(Duration.days(1));
+
+      expect(await withdrawableReward(user1)).to.equal(100);
+
+      await idosStaking.setEpochReward(200);
+      await networkHelpers.time.increase(Duration.days(1));
+      expect(await withdrawableReward(user1)).to.equal(100 + 200);
+
+      await idosStaking.setEpochReward(300);
+      await networkHelpers.time.increase(Duration.days(1));
+      expect(await withdrawableReward(user1)).to.equal(100 + 200 + 300);
     });
 
     it("Works I", async () => {

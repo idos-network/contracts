@@ -23,9 +23,11 @@ error NotContractAddress(address notContract);
 error NotStarted();
 error ZeroAddressNode();
 error ZeroAddressToken();
+error EpochRewardDidntChange();
 
 contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableMap for EnumerableMap.UintToUintMap;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -44,6 +46,8 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     EnumerableSet.AddressSet private slashedNodes;
     EnumerableSet.AddressSet private allowlistedNodes;
     mapping(address => mapping(address => uint256)) public stakeByNodeByUser;
+    // Key is the epoch where the reward was set.
+    EnumerableMap.UintToUintMap private epochRewardChanges;
     mapping(uint48 => uint256) public stakedByEpoch;
     mapping(uint48 => uint256) public unstakedByEpoch;
     mapping(uint48 => EnumerableSet.AddressSet) private slashesByEpoch;
@@ -59,8 +63,9 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     event RewardWithdraw(address indexed user, uint256 amount);
     event UnstakedWithdraw(address indexed user, uint256 amount);
     event SlashedWithdraw(uint256 amount);
+    event EpochRewardChanged(uint48 epoch, uint256 prevReward, uint256 newReward);
 
-    constructor(address idosTokenAddress, address initialOwner, uint48 startTime_)
+    constructor(address idosTokenAddress, address initialOwner, uint48 startTime_, uint256 epochReward_)
         Ownable(initialOwner)
     {
         if (idosTokenAddress == address(0)) revert ZeroAddressToken();
@@ -68,6 +73,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
         idosToken = IERC20(idosTokenAddress);
         startTime = startTime_;
+        epochRewardChanges.set(0, epochReward_);
     }
 
     function allowNode(address node)
@@ -208,11 +214,13 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         uint48 thisEpoch = currentEpoch();
         (, uint256 withdrawnAmount) = rewardWithdrawalsByUser.tryGet(user);
 
-        uint256 thisReward = 100;
-
         uint256 userStakeAcc;
         uint256 totalStakeAcc;
+        uint256 epochReward = epochRewardChanges.get(0);
         for (uint48 i; i < thisEpoch; i++) {
+            (bool exists, uint256 rewardAtEpoch) = epochRewardChanges.tryGet(i);
+            if (exists) epochReward = rewardAtEpoch;
+
             userStakeAcc += stakeByUserByEpoch[i][user];
             userStakeAcc -= unstakeByUserByEpoch[i][user];
 
@@ -226,10 +234,20 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
             }
 
             if (totalStakeAcc == 0) continue;
-            reward += userStakeAcc * thisReward / totalStakeAcc;
+            reward += (userStakeAcc * epochReward) / totalStakeAcc;
         }
 
         reward = Math.saturatingSub(reward, withdrawnAmount);
+    }
+
+    /// @notice Set the reward per epoch
+    /// @param newReward The new reward value
+    function setEpochReward(uint256 newReward) external onlyOwner {
+        uint256 prevReward = epochRewardChanges.get(epochRewardChanges.length()-1);
+        require(newReward != prevReward, EpochRewardDidntChange());
+
+        epochRewardChanges.set(currentEpoch(), newReward);
+        emit EpochRewardChanged(currentEpoch(), prevReward, newReward);
     }
 
     function withdrawReward()
