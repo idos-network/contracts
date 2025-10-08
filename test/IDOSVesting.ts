@@ -6,11 +6,8 @@ const { ethers, networkHelpers } = await network.connect();
 const accounts = await ethers.getSigners();
 const [owner, alice] = accounts;
 
-const decimals = 18;
-const totalSupply = ethers.parseUnits(BigInt(1e9).toString(), decimals);
-
-describe("IDOSVesting", function () {
-  it("Should work without cliff", async function () {
+describe("IDOSVesting", () => {
+  it("Should work without cliff", async () => {
     const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
 
     const now = await networkHelpers.time.latest();
@@ -23,7 +20,7 @@ describe("IDOSVesting", function () {
     await idosToken.transfer(idosVesting, 100);
 
     const idosTokenAddress = ethers.Typed.address(await idosToken.getAddress());
-    const releasableAfter = async (days) => {
+    const releasableAfter = async (days: number) => {
       if (days > 0) await networkHelpers.time.increaseTo(now + networkHelpers.time.duration.days(days));
       return await idosVesting.releasable(idosTokenAddress);
     };
@@ -45,7 +42,7 @@ describe("IDOSVesting", function () {
     expect(await releasableAfter(1000)).to.equal(100);
   });
 
-  it("Should work with cliff", async function () {
+  it("Should work with cliff", async () => {
     const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
 
     const now = await networkHelpers.time.latest();
@@ -58,7 +55,7 @@ describe("IDOSVesting", function () {
     await idosToken.transfer(idosVesting, 100);
 
     const idosTokenAddress = ethers.Typed.address(await idosToken.getAddress());
-    const releasableAfter = async (days) => {
+    const releasableAfter = async (days: number) => {
       if (days > 0) await networkHelpers.time.increaseTo(now + networkHelpers.time.duration.days(days));
       return await idosVesting.releasable(idosTokenAddress);
     };

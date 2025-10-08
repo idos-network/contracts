@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { network } from "hardhat";
+import type { IDOSToken } from "../types/ethers-contracts/index.js";
 
 const { ethers } = await network.connect();
 
@@ -9,48 +10,55 @@ const [owner, alice] = accounts;
 const decimals = 18;
 const totalSupply = ethers.parseUnits(BigInt(1e9).toString(), decimals);
 
-describe("IDOSToken", function () {
-  it("Should premint 1B tokens", async function () {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+describe("IDOSToken", () => {
+	let idosToken: IDOSToken;
 
-    expect(await idosToken.totalSupply()).to.equal(totalSupply);
-  });
+	beforeEach(async () => {
+		idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;
+	});
 
-  it("Should not allow minting", async function () {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+	it("Should premint 1B tokens", async () => {
+		expect(await idosToken.totalSupply()).to.equal(totalSupply);
+	});
 
-    expect(idosToken.mint).to.equal(undefined);
-    expect(idosToken._mint).to.equal(undefined);
-  });
+	it("Should not allow minting", async () => {
+		// @ts-expect-error
+		expect(idosToken.mint).to.equal(undefined);
+		// @ts-expect-error
+		expect(idosToken._mint).to.equal(undefined);
+	});
 
-  it("Should allow burning", async function () {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+	it("Should allow burning", async () => {
+		expect(await idosToken.balanceOf(alice)).to.equal(0);
 
-    expect(await idosToken.balanceOf(alice)).to.equal(0);
+		await idosToken.transfer(alice, 1);
 
-    await idosToken.transfer(alice, 1);
+		expect(await idosToken.balanceOf(alice)).to.equal(1);
 
-    expect(await idosToken.balanceOf(alice)).to.equal(1);
+		await idosToken.connect(alice).burn(1);
 
-    await idosToken.connect(alice).burn(1);
+		expect(await idosToken.balanceOf(alice)).to.equal(0);
+		expect(await idosToken.totalSupply()).to.equal(totalSupply - 1n);
+	});
 
-    expect(await idosToken.balanceOf(alice)).to.equal(0);
-    expect(await idosToken.totalSupply()).to.equal(totalSupply - 1n);
-  });
+	it("Should allow pausing and unpausing by owner", async () => {
+		await expect(
+			idosToken.connect(alice).pause(),
+		).to.be.revertedWithCustomError(idosToken, "OwnableUnauthorizedAccount");
 
-  it("Should allow pausing and unpausing by owner", async function () {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+		await idosToken.pause();
 
-    await expect(idosToken.connect(alice).pause()).to.be.revertedWithCustomError(idosToken, "OwnableUnauthorizedAccount");
+		await expect(idosToken.transfer(alice, 1)).to.be.revertedWithCustomError(
+			idosToken,
+			"EnforcedPause",
+		);
+		expect(await idosToken.balanceOf(alice)).to.equal(0);
 
-    await idosToken.pause();
+		await idosToken.unpause();
 
-    await expect(idosToken.transfer(alice, 1)).to.be.revertedWithCustomError(idosToken, "EnforcedPause");
-    expect(await idosToken.balanceOf(alice)).to.equal(0);
-
-    await idosToken.unpause();
-
-    await expect(idosToken.transfer(alice, 1)).to.not.be.revertedWithCustomError(idosToken, "EnforcedPause");
-    expect(await idosToken.balanceOf(alice)).to.equal(1);
-  });
+		await expect(
+			idosToken.transfer(alice, 1),
+		).to.not.be.revertedWithCustomError(idosToken, "EnforcedPause");
+		expect(await idosToken.balanceOf(alice)).to.equal(1);
+	});
 });

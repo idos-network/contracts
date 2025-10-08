@@ -1,10 +1,11 @@
-export class Duration {
-  static {
-    this.minutes = (n: int): int => 60 * n;
-    this.hours   = (n: int): int => 60 * this.minutes(n);
-    this.days    = (n: int): int => 24 * this.hours(n);
-  }
-}
+export const Duration = {
+  minutes: (n: number): number => 60 * n,
+  hours:   (n: number): number => 60 * Duration.minutes(n),
+  days:    (n: number): number => 24 * Duration.hours(n),
+};
 
-export const evmTimestamp = (...dateFields): int =>
-  new Date(dateFields).getTime() / 1000;
+export const evmTimestamp = (
+  year: number,
+  month: number,
+  day: number = 1,
+): number => Math.floor(new Date(year, month - 1, day).getTime() / 1000);

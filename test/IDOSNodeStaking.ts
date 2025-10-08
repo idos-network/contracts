@@ -1,48 +1,52 @@
 import { expect } from "chai";
+import type { Signer } from "ethers";
 import { network } from "hardhat";
-import { Duration, evmTimestamp } from "./utils/time"
+import type { IDOSNodeStaking, IDOSToken, } from "../types/ethers-contracts/index.js";
+import { Duration, evmTimestamp } from "./utils/time.js";
 
 const { ethers, networkHelpers } = await network.connect();
 
 const accounts = await ethers.getSigners();
 const [owner, user1, user2, user3, node1, node2, node3] = accounts;
 
+type SignerWithAddress = Signer & { address: string };
+
 const ZERO_ADDR = ethers.ZeroAddress;
-const ZERO_ACCT = { address: ZERO_ADDR };
+const ZERO_ACCT = { address: ZERO_ADDR } as SignerWithAddress;
 
 describe("IDOSNodeStaking", () => {
-  let idosToken, idosStaking;
+  let idosToken: IDOSToken, idosStaking: IDOSNodeStaking;
 
-  const stake = (user, node, amount) =>
+  const stake = (user: SignerWithAddress, node: SignerWithAddress, amount: number) =>
     idosStaking.connect(user).stake(ZERO_ADDR, node.address, amount);
 
-  const unstake = (user, node, amount) =>
+  const unstake = (user: SignerWithAddress, node: SignerWithAddress, amount: number) =>
     idosStaking.connect(user).unstake(node.address, amount);
 
-  const slash = (node) =>
+  const slash = (node: SignerWithAddress) =>
     idosStaking.slash(node);
 
-  const stakeByNodeByUser = (user, node) =>
+  const stakeByNodeByUser = (user: SignerWithAddress, node: SignerWithAddress) =>
     idosStaking.stakeByNodeByUser(user.address, node.address);
 
-  const getNodeStake = (node) =>
+  const getNodeStake = (node: SignerWithAddress) =>
     idosStaking.getNodeStake(node.address);
 
-  const getUserStake = (user) =>
+  const getUserStake = (user: SignerWithAddress) =>
     idosStaking.getUserStake(user.address);
 
-  const withdrawableReward = (user) =>
+  const withdrawableReward = (user: SignerWithAddress) =>
     idosStaking.withdrawableReward(user.address);
 
   const setup = async () => {
-    idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+    idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;
 
-    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11), 100]);
+    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11), 100]) as unknown as IDOSNodeStaking;
 
     await idosToken.transfer(idosStaking, 10000);
 
     const idosStakingAddress = await idosStaking.getAddress();
-    for (let user of [user1, user2, user3]) {
+    for (const user of [user1, user2, user3]) {
       await idosToken.transfer(user, 1000);
       await idosToken.connect(user).approve(idosStakingAddress, 1000);
     }
@@ -104,7 +108,7 @@ describe("IDOSNodeStaking", () => {
       });
 
       it("Can't withdrawReward", async () => {
-        await expect(idosStaking.withdrawReward(user1))
+        await expect(idosStaking.connect(user1).withdrawReward())
           .to.be.revertedWithCustomError(idosStaking, "EnforcedPause");
       });
     });
