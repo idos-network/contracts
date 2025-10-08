@@ -266,43 +266,6 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         activeStake = totalStake - slashedStake;
     }
 
-    // TODO broken all over the place; for one, it can include nodes not allowed
-    function nodeLeaderboard(uint256 maxSize)
-        public view
-        returns (NodeStake[] memory leaderboard)
-    {
-        NodeStake[] memory unslashedNodeStakes = getNodeStakes();
-
-        uint256 availableSize = Math.min(unslashedNodeStakes.length, allowlistedNodes.length());
-        uint256 maxReturnSize = Math.min(maxSize, availableSize);
-
-        NodeStake[] memory nodeStakes = new NodeStake[](maxReturnSize);
-
-        uint256[] memory allowlistedStakes = new uint256[](allowlistedNodes.length());
-
-        uint i;
-        for (i = 0; i < allowlistedNodes.length(); i++)
-            allowlistedStakes[i] = stakeByNode.get(allowlistedNodes.at(i));
-
-        allowlistedStakes = Arrays.sort(allowlistedStakes); // increasing order
-
-        uint returnIndex;
-        for (int _i = int(allowlistedStakes.length) - 1; _i >= 0 && returnIndex < maxReturnSize; _i--) {
-            i = uint(_i);
-            for (uint j; j < stakeByNode.length(); j++) {
-                (address node, uint256 stake_) = stakeByNode.at(j);
-                if (stake_ != allowlistedStakes[i] || slashedNodes.contains(node)) continue;
-
-                nodeStakes[returnIndex++] = NodeStake(node, stake_);
-            }
-        }
-
-        leaderboard = new NodeStake[](returnIndex);
-
-        for (i = 0; i < leaderboard.length; i++)
-            leaderboard[i] = nodeStakes[i];
-    }
-
     function getNodeStakes()
         public view
         returns (NodeStake[] memory unslashedNodeStakes)
