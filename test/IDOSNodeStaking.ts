@@ -35,8 +35,8 @@ describe("IDOSNodeStaking", () => {
   const getUserStake = (user: SignerWithAddress) =>
     idosStaking.getUserStake(user.address);
 
-  const withdrawableReward = (user: SignerWithAddress) =>
-    idosStaking.withdrawableReward(user.address);
+  const withdrawableReward = async (user: SignerWithAddress) =>
+    (await idosStaking.withdrawableReward(user.address)).withdrawableAmount;
 
   const setup = async () => {
     idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;

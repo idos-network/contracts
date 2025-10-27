@@ -39,6 +39,12 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
     struct Unstake { uint256 amount; uint48 timestamp; }
     struct NodeStake { address node; uint256 stake; }
+    struct EpochCheckpoint {
+        uint48 epoch;
+        uint256 rewardAcc;
+        uint256 userStakeAcc;
+        uint256 totalStakeAcc;
+    }
 
     EnumerableMap.AddressToUintMap private stakeByNode;
     EnumerableMap.AddressToUintMap private stakeByUser;
@@ -54,6 +60,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     mapping(uint48 => mapping(address => uint256)) public stakeByUserByEpoch;
     mapping(uint48 => mapping(address => uint256)) public unstakeByUserByEpoch;
     mapping(address => Unstake[]) public unstakesByUser;
+    mapping(address => EpochCheckpoint) private epochCheckpointByUser;
 
     event Allowed(address indexed node);
     event Disallowed(address indexed node);
@@ -118,6 +125,8 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         (, uint256 userStake) = stakeByUser.tryGet(user);
         stakeByUser.set(user, userStake + amount);
 
+        createEpochCheckpoint(user);
+
         emit Staked(user, node, amount);
     }
 
@@ -153,6 +162,8 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         }
 
         unstakesByUser[msg.sender].push(Unstake(amount, uint48(block.timestamp)));
+
+        createEpochCheckpoint(msg.sender);
 
         emit Unstaked(msg.sender, node, amount);
     }
@@ -209,15 +220,15 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     // TODO staking rewards change yearly
     function withdrawableReward(address user)
         public view
-        returns (uint256 reward)
+        returns (uint256 withdrawableAmount, uint256 rewardAcc, uint256 userStakeAcc, uint256 totalStakeAcc)
     {
-        uint48 thisEpoch = currentEpoch();
-        (, uint256 withdrawnAmount) = rewardWithdrawalsByUser.tryGet(user);
-
-        uint256 userStakeAcc;
-        uint256 totalStakeAcc;
+        EpochCheckpoint memory checkpoint = epochCheckpointByUser[user];
+        rewardAcc = checkpoint.rewardAcc;
+        userStakeAcc = checkpoint.userStakeAcc;
+        totalStakeAcc = checkpoint.totalStakeAcc;
         uint256 epochReward = epochRewardChanges.get(0);
-        for (uint48 i; i < thisEpoch; i++) {
+
+        for (uint48 i = checkpoint.epoch; i < currentEpoch(); i++) {
             (bool exists, uint256 rewardAtEpoch) = epochRewardChanges.tryGet(i);
             if (exists) epochReward = rewardAtEpoch;
 
@@ -234,10 +245,32 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
             }
 
             if (totalStakeAcc == 0) continue;
-            reward += (userStakeAcc * epochReward) / totalStakeAcc;
+            rewardAcc += (userStakeAcc * epochReward) / totalStakeAcc;
         }
 
-        reward = Math.saturatingSub(reward, withdrawnAmount);
+        (, uint256 withdrawnAlready) = rewardWithdrawalsByUser.tryGet(user);
+        withdrawableAmount = rewardAcc - withdrawnAlready;
+    }
+
+    function createEpochCheckpoint(address user)
+        public
+        returns (uint256)
+    {
+        (
+            uint256 withdrawableAmount,
+            uint256 rewardAcc,
+            uint256 userStakeAcc,
+            uint256 totalStakeAcc
+        ) = withdrawableReward(user);
+
+        epochCheckpointByUser[user] = EpochCheckpoint(
+            currentEpoch(),
+            rewardAcc,
+            userStakeAcc,
+            totalStakeAcc
+        );
+
+        return withdrawableAmount;
     }
 
     /// @notice Set the reward per epoch
@@ -253,7 +286,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     function withdrawReward()
         external nonReentrant whenNotPaused
     {
-        uint256 withdrawableAmount = withdrawableReward(msg.sender);
+        (uint256 withdrawableAmount) = createEpochCheckpoint(msg.sender);
 
         require(withdrawableAmount > 0, NoWithdrawableRewards());
 
