@@ -276,7 +276,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     /// @notice Set the reward per epoch
     /// @param newReward The new reward value
     function setEpochReward(uint256 newReward) external onlyOwner {
-        uint256 prevReward = epochRewardChanges.get(epochRewardChanges.length()-1);
+        (, uint256 prevReward) = epochRewardChanges.at(epochRewardChanges.length()-1);
         require(newReward != prevReward, EpochRewardDidntChange());
 
         epochRewardChanges.set(currentEpoch(), newReward);
