@@ -339,6 +339,15 @@ describe("IDOSNodeStaking", () => {
         .withArgs(randomAddress);
     });
 
+    it("Slashed nodes can't be slashed", async () => {
+      await stake(user1, node1, 100);
+      await slash(node1);
+
+      await expect(idosStaking.slash(node1.address))
+        .to.be.revertedWithCustomError(idosStaking, "NodeIsSlashed")
+        .withArgs(node1.address);
+    });
+
     it("Known nodes can be slashed only by owner", async () => {
       await stake(user1, node1, 100);
 

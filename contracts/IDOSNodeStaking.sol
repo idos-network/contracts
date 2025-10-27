@@ -190,6 +190,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     {
         require(node != address(0), ZeroAddressNode());
         require(stakeByNode.contains(node), NodeIsUnknown(node));
+        require(!slashedNodes.contains(node), NodeIsSlashed(node));
 
         slashedNodes.add(node);
         slashesByEpoch[currentEpoch()].add(node);
