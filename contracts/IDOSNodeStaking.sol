@@ -218,7 +218,6 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     }
 
     // TODO nodes should be able to set a % they take from delegates
-    // TODO staking rewards change yearly
     function withdrawableReward(address user)
         public view
         returns (uint256 withdrawableAmount, uint256 rewardAcc, uint256 userStakeAcc, uint256 totalStakeAcc)
