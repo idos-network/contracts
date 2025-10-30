@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 error AmountExceedsStake(uint256 amount, uint256 stake);
 error AmountNotPositive(uint256 amount);
+error EpochRewardDidntChange();
 error ERC20TransferAmountMismatch(uint256 expected, uint256 received);
 error NoWithdrawableRewards();
 error NoWithdrawableSlashedStakes();
@@ -23,7 +24,6 @@ error NotContractAddress(address notContract);
 error NotStarted();
 error ZeroAddressNode();
 error ZeroAddressToken();
-error EpochRewardDidntChange();
 
 contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
@@ -170,8 +170,9 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
     function withdrawUnstaked()
         external nonReentrant whenNotPaused
+        returns (uint256 withdrawableAmount)
     {
-        uint256 withdrawableAmount;
+        withdrawableAmount;
         for (uint i; i < unstakesByUser[msg.sender].length; i++)
             if (unstakesByUser[msg.sender][i].timestamp < uint48(block.timestamp) - UNSTAKE_DELAY) {
                 withdrawableAmount += unstakesByUser[msg.sender][i].amount;
@@ -285,8 +286,9 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
     function withdrawReward()
         external nonReentrant whenNotPaused
+        returns (uint256 withdrawableAmount)
     {
-        (uint256 withdrawableAmount) = createEpochCheckpoint(msg.sender);
+        withdrawableAmount = createEpochCheckpoint(msg.sender);
 
         require(withdrawableAmount > 0, NoWithdrawableRewards());
 
