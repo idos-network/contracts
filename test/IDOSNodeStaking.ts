@@ -41,7 +41,7 @@ describe("IDOSNodeStaking", () => {
   const setup = async () => {
     idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;
 
-    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2025, 11), 100]) as unknown as IDOSNodeStaking;
+    idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2026, 11), 100]) as unknown as IDOSNodeStaking;
 
     await idosToken.transfer(idosStaking, 10000);
 
@@ -148,7 +148,7 @@ describe("IDOSNodeStaking", () => {
 
     describe("After starting", () => {
       beforeEach(async () => {
-        await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+        await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
       });
 
       it("Epochs last 1 day", async () => {
@@ -231,7 +231,7 @@ describe("IDOSNodeStaking", () => {
 
     describe("After starting", () => {
       beforeEach(async () => {
-        await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+        await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
         await stake(user1, node1, 100);
       });
 
@@ -324,7 +324,7 @@ describe("IDOSNodeStaking", () => {
 
   describe("Slashing", () => {
     beforeEach(async () => {
-      await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
     });
 
     it("Unknown nodes can't be slashed", async () => {
@@ -390,7 +390,7 @@ describe("IDOSNodeStaking", () => {
 
   describe("Rewards", () => {
     beforeEach(async () => {
-      await networkHelpers.time.increaseTo(evmTimestamp(2025, 11));
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
     });
 
     // Ensure sniping prevention: first staker in epoch
