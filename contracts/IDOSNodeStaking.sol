@@ -45,6 +45,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         uint256 rewardAcc;
         uint256 userStakeAcc;
         uint256 totalStakeAcc;
+        uint256 epochReward;
     }
 
     EnumerableMap.AddressToUintMap private stakeByNode;
@@ -229,7 +230,10 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         rewardAcc = checkpoint.rewardAcc;
         userStakeAcc = checkpoint.userStakeAcc;
         totalStakeAcc = checkpoint.totalStakeAcc;
-        uint256 epochReward = epochRewardChanges.get(0);
+
+        uint256 epochReward = checkpoint.epoch == 0
+            ? epochRewardChanges.get(0)
+            : checkpoint.epochReward;
 
         for (uint48 i = checkpoint.epoch; i < currentEpoch(); i++) {
             (bool exists, uint256 rewardAtEpoch) = epochRewardChanges.tryGet(i);
@@ -266,19 +270,41 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
             uint256 totalStakeAcc
         ) = withdrawableReward(user);
 
+        uint48 epoch = currentEpoch();
+
         epochCheckpointByUser[user] = EpochCheckpoint(
-            currentEpoch(),
+            epoch,
             rewardAcc,
             userStakeAcc,
-            totalStakeAcc
+            totalStakeAcc,
+            _getEffectiveEpochReward(epoch)
         );
 
         return withdrawableAmount;
     }
 
+    function _getEffectiveEpochReward(uint48 epoch)
+        internal view
+        returns (uint256 effectiveReward)
+    {
+        effectiveReward = epochRewardChanges.get(0);
+        uint256 latestApplicableEpoch = 0;
+
+        for (uint256 i = 0; i < epochRewardChanges.length(); i++) {
+            (uint256 changeEpoch, uint256 reward) = epochRewardChanges.at(i);
+            if (changeEpoch <= epoch && changeEpoch > latestApplicableEpoch) {
+                latestApplicableEpoch = changeEpoch;
+                effectiveReward = reward;
+            }
+        }
+    }
+
     /// @notice Set the reward per epoch
     /// @param newReward The new reward value
-    function setEpochReward(uint256 newReward) external onlyOwner {
+    function setEpochReward(uint256 newReward)
+        external
+        onlyOwner
+    {
         (, uint256 prevReward) = epochRewardChanges.at(epochRewardChanges.length()-1);
         require(newReward != prevReward, EpochRewardDidntChange());
 

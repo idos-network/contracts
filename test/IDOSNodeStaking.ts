@@ -559,5 +559,43 @@ describe("IDOSNodeStaking", () => {
       expect(await withdrawableReward(user2)).to.equal(2070);
       expect(await withdrawableReward(user3)).to.equal(440);
     });
+
+    // PoC from audit — should pass this test
+    it.only("shows wrong epoch rewards computation", async () => {
+      await stake(user1, node1, 100);
+
+      //this is correct, we have 100 tokens/ day * 5 days
+      await networkHelpers.time.increase(Duration.days(5));
+      expect(await withdrawableReward(user1)).to.equal(500);
+
+      //at epoch 5 the admin updates the rewards. From here on, each epoch should yield 200 tokens/day
+      await idosStaking.setEpochReward(200);
+
+      //we advance to epoch 7
+      await networkHelpers.time.increase(Duration.days(2));
+
+      //we checkpoint the user at epoch 7, and their total rewards are correct
+      //(5 * 100) + (2 * 200) = 900 tokens
+      await idosStaking.connect(user1).createEpochCheckpoint(user1.address);
+      expect(await withdrawableReward(user1)).to.equal(900);
+
+      // from here on, rewards are wrong
+      await networkHelpers.time.increase(Duration.days(3));
+      const withdrawable = await withdrawableReward(user1);
+
+      // With correct sticky semantics:
+      // - epochs 0–4: 5 * 100 = 500
+      // - epochs 5–9: 5 * 200 = 1000
+      //   => total = 1500
+      //
+      // The current implementation incorrectly re-initializes epochReward to the
+      // default value at index 0 when starting from checkpoint.epoch = 7,
+      // and since there is no epochRewardChanges[7/8/9], it uses 100 instead of 200
+      // for epochs 7–9, giving:
+      //   500 (epochs 0–4) + 400 (epochs 5–6) + 300 (epochs 7–9) = 1200.
+
+      //expect(withdrawable).to.equal(1200);
+      expect(withdrawable).to.equal(1500);
+    });
   });
 });
