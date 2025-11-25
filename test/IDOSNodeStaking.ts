@@ -561,7 +561,7 @@ describe("IDOSNodeStaking", () => {
     });
 
     // PoC from audit — should pass this test
-    it.only("shows wrong epoch rewards computation", async () => {
+    it("shows wrong epoch rewards computation", async () => {
       await stake(user1, node1, 100);
 
       //this is correct, we have 100 tokens/ day * 5 days
