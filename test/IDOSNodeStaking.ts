@@ -17,6 +17,9 @@ const ZERO_ACCT = { address: ZERO_ADDR } as SignerWithAddress;
 describe("IDOSNodeStaking", () => {
   let idosToken: IDOSToken, idosStaking: IDOSNodeStaking;
 
+  const allowNode = (node: SignerWithAddress) =>
+    idosStaking.allowNode(node);
+
   const stake = (user: SignerWithAddress, node: SignerWithAddress, amount: number) =>
     idosStaking.connect(user).stake(ZERO_ADDR, node.address, amount);
 
@@ -116,7 +119,7 @@ describe("IDOSNodeStaking", () => {
 
   describe("Allowlisting", () => {
     it("Node can be allowed only by owner", async () => {
-      await expect(idosStaking.allowNode(node1)).to.not.revert(ethers);
+      await expect(allowNode(node1)).to.not.revert(ethers);
 
       await expect(idosStaking.connect(user1).allowNode(node1))
         .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
@@ -130,7 +133,7 @@ describe("IDOSNodeStaking", () => {
     });
 
     it("Emits events", async () => {
-      await expect(idosStaking.allowNode(node1))
+      await expect(allowNode(node1))
         .to.emit(idosStaking, "Allowed").withArgs(node1.address);
 
       await expect(idosStaking.disallowNode(node2))
@@ -141,6 +144,8 @@ describe("IDOSNodeStaking", () => {
   describe("Staking", () => {
     describe("Before starting", () => {
       it("Can't stake yet", async () => {
+        await idosStaking.allowNode(node1);
+
         await expect(stake(user1, node1, 100))
           .to.be.revertedWithCustomError(idosStaking, "NotStarted");
       });
@@ -166,6 +171,8 @@ describe("IDOSNodeStaking", () => {
       });
 
       it("Can't stake against slashed node", async () => {
+        await allowNode(node1);
+
         await stake(user1, node1, 1);
         await slash(node1);
 
@@ -173,19 +180,31 @@ describe("IDOSNodeStaking", () => {
           .to.be.revertedWithCustomError(idosStaking, "NodeIsSlashed");
       });
 
+      it("Can't stake against non-allowed node", async () => {
+        await expect(stake(user1, node1, 100))
+          .to.be.revertedWithCustomError(idosStaking, "NodeIsNotAllowed");
+      });
+
       it("Can only stake positive amounts", async () => {
+        await allowNode(node1);
+
         await expect(stake(user1, node1, 0))
           .to.be.revertedWithCustomError(idosStaking, "AmountNotPositive")
           .withArgs(0);
       });
 
       it("Emits events", async () => {
+        await allowNode(node1);
+
         await expect(stake(user1, node1, 100))
           .to.emit(idosStaking, "Staked")
           .withArgs(user1.address, node1.address, 100);
       });
 
       it("Works", async () => {
+        await allowNode(node1);
+        await allowNode(node2);
+
         await stake(user1, node1, 100);
 
         expect(await stakeByNodeByUser(user1, node1)).to.equal(100);
@@ -232,6 +251,7 @@ describe("IDOSNodeStaking", () => {
     describe("After starting", () => {
       beforeEach(async () => {
         await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+        await allowNode(node1);
         await stake(user1, node1, 100);
       });
 
@@ -325,6 +345,7 @@ describe("IDOSNodeStaking", () => {
   describe("Slashing", () => {
     beforeEach(async () => {
       await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await allowNode(node1);
     });
 
     it("Unknown nodes can't be slashed", async () => {
@@ -391,6 +412,7 @@ describe("IDOSNodeStaking", () => {
   describe("Rewards", () => {
     beforeEach(async () => {
       await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await Promise.all([node1, node2, node3].map(node => allowNode(node)));
     });
 
     // Ensure sniping prevention: first staker in epoch

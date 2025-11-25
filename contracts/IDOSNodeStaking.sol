@@ -18,6 +18,7 @@ error ERC20TransferAmountMismatch(uint256 expected, uint256 received);
 error NoWithdrawableRewards();
 error NoWithdrawableSlashedStakes();
 error NoWithdrawableStake();
+error NodeIsNotAllowed(address node);
 error NodeIsSlashed(address node);
 error NodeIsUnknown(address node);
 error NotContractAddress(address notContract);
@@ -103,6 +104,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         external nonReentrant whenNotPaused
     {
         require(node != address(0), ZeroAddressNode());
+        require(allowlistedNodes.contains(node), NodeIsNotAllowed(node));
         require(!slashedNodes.contains(node), NodeIsSlashed(node));
         require(amount > 0, AmountNotPositive(amount));
         require(block.timestamp >= startTime, NotStarted());
