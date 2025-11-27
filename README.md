@@ -1,5 +1,9 @@
 # Contracts
 
+See the [Audit report](./NM0731-FINAL_IDOS.pdf)
+
+## Running
+
 - `pnpm i`
 - `pnpm hardhat compile` (required to generate types)
 - `pnpm hardhat test`
