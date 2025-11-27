@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -27,6 +28,7 @@ error ZeroAddressNode();
 error ZeroAddressToken();
 
 contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
+    using Checkpoints for Checkpoints.Trace256;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableMap for EnumerableMap.UintToUintMap;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -53,8 +55,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     EnumerableSet.AddressSet private slashedNodes;
     EnumerableSet.AddressSet private allowlistedNodes;
     mapping(address => mapping(address => uint256)) public stakeByNodeByUser;
-    // Key is the epoch where the reward was set.
-    EnumerableMap.UintToUintMap private epochRewardChanges;
+    Checkpoints.Trace256 private epochRewardHistory;
     mapping(uint48 => uint256) public stakedByEpoch;
     mapping(uint48 => uint256) public unstakedByEpoch;
     mapping(uint48 => EnumerableSet.AddressSet) private slashesByEpoch;
@@ -81,7 +82,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
         idosToken = IERC20(idosTokenAddress);
         startTime = startTime_;
-        epochRewardChanges.set(0, epochReward_);
+        epochRewardHistory.push(0, epochReward_);
     }
 
     function allowNode(address node)
@@ -229,11 +230,9 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         rewardAcc = checkpoint.rewardAcc;
         userStakeAcc = checkpoint.userStakeAcc;
         totalStakeAcc = checkpoint.totalStakeAcc;
-        uint256 epochReward = epochRewardChanges.get(0);
 
         for (uint48 i = checkpoint.epoch; i < currentEpoch(); i++) {
-            (bool exists, uint256 rewardAtEpoch) = epochRewardChanges.tryGet(i);
-            if (exists) epochReward = rewardAtEpoch;
+            uint256 epochReward = epochRewardHistory.upperLookup(i);
 
             userStakeAcc += stakeByUserByEpoch[i][user];
             userStakeAcc -= unstakeByUserByEpoch[i][user];
@@ -279,10 +278,10 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     /// @notice Set the reward per epoch
     /// @param newReward The new reward value
     function setEpochReward(uint256 newReward) external onlyOwner {
-        (, uint256 prevReward) = epochRewardChanges.at(epochRewardChanges.length()-1);
+        uint256 prevReward = epochRewardHistory.latest();
         require(newReward != prevReward, EpochRewardDidntChange());
 
-        epochRewardChanges.set(currentEpoch(), newReward);
+        epochRewardHistory.push(currentEpoch(), newReward);
         emit EpochRewardChanged(currentEpoch(), prevReward, newReward);
     }
 
