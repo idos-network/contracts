@@ -7,7 +7,7 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract IDOSToken is ERC20, ERC20Burnable, ERC20Permit {
-    constructor(address initialTreasury, address initialOwner)
+    constructor(address initialTreasury)
         ERC20("IDOSToken", "IDOS")
         ERC20Permit("IDOSToken")
     {

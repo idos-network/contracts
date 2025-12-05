@@ -14,7 +14,7 @@ describe("IDOSToken", () => {
 	let idosToken: IDOSToken;
 
 	beforeEach(async () => {
-		idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;
+		idosToken = await ethers.deployContract("IDOSToken", [owner]) as unknown as IDOSToken;
 	});
 
 	it("Should premint 1B tokens", async () => {

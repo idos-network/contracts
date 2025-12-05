@@ -42,7 +42,7 @@ describe("IDOSNodeStaking", () => {
     (await idosStaking.withdrawableReward(user.address)).withdrawableAmount;
 
   const setup = async () => {
-    idosToken = await ethers.deployContract("IDOSToken", [owner, owner]) as unknown as IDOSToken;
+    idosToken = await ethers.deployContract("IDOSToken", [owner]) as unknown as IDOSToken;
 
     idosStaking = await ethers.deployContract("IDOSNodeStaking", [await idosToken.getAddress(), owner, evmTimestamp(2026, 11), 100]) as unknown as IDOSNodeStaking;
 
