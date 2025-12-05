@@ -8,7 +8,7 @@ const [owner, alice] = accounts;
 
 describe("IDOSVesting", () => {
   it("Should work without cliff", async () => {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+    const idosToken = await ethers.deployContract("IDOSToken", [owner]);
 
     const now = await networkHelpers.time.latest();
     const start = now + networkHelpers.time.duration.days(10);
@@ -43,7 +43,7 @@ describe("IDOSVesting", () => {
   });
 
   it("Should work with cliff", async () => {
-    const idosToken = await ethers.deployContract("IDOSToken", [owner, owner]);
+    const idosToken = await ethers.deployContract("IDOSToken", [owner]);
 
     const now = await networkHelpers.time.latest();
     const start = now + networkHelpers.time.duration.days(10);
