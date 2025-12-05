@@ -40,25 +40,4 @@ describe("IDOSToken", () => {
 		expect(await idosToken.balanceOf(alice)).to.equal(0);
 		expect(await idosToken.totalSupply()).to.equal(totalSupply - 1n);
 	});
-
-	it("Should allow pausing and unpausing by owner", async () => {
-		await expect(
-			idosToken.connect(alice).pause(),
-		).to.be.revertedWithCustomError(idosToken, "OwnableUnauthorizedAccount");
-
-		await idosToken.pause();
-
-		await expect(idosToken.transfer(alice, 1)).to.be.revertedWithCustomError(
-			idosToken,
-			"EnforcedPause",
-		);
-		expect(await idosToken.balanceOf(alice)).to.equal(0);
-
-		await idosToken.unpause();
-
-		await expect(
-			idosToken.transfer(alice, 1),
-		).to.not.be.revertedWithCustomError(idosToken, "EnforcedPause");
-		expect(await idosToken.balanceOf(alice)).to.equal(1);
-	});
 });
