@@ -35,6 +35,28 @@ const config: HardhatUserConfig = {
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
+    arbitrumSepolia: {
+      type: "http",
+      url: configVariable("ARBITRUM_SEPOLIA_RPC_URL"),
+      accounts: [configVariable("ARBITRUM_SEPOLIA_PRIVATE_KEY")],
+    },
+  },
+  chainDescriptors: {
+    421614: {
+        name: "arbitrumSepolia",
+        blockExplorers: {
+          etherscan: {
+            name: "Arbiscan Sepolia",
+            apiUrl: "https://api-sepolia.arbiscan.io/api",
+            url: "https://sepolia.arbiscan.io/",
+        },
+      },
+    },
+  },
+  verify: {
+    etherscan: {
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
+    },
   },
 };
 
