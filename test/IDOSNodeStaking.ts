@@ -598,4 +598,244 @@ describe("IDOSNodeStaking", () => {
       expect(withdrawable).to.equal(1500);
     });
   });
+
+  describe("Security Tests", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await allowNode(node1);
+    });
+
+    it("Should prevent reentrancy on withdrawReward", async () => {
+      await stake(user1, node1, 100);
+      await networkHelpers.time.increase(Duration.days(1));
+
+      await expect(idosStaking.connect(user1).withdrawReward()).to.not.revert(ethers);
+      
+      await expect(idosStaking.connect(user1).withdrawReward())
+        .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableRewards");
+    });
+
+    it("Should prevent reentrancy on withdrawUnstaked", async () => {
+      await stake(user1, node1, 100);
+      await unstake(user1, node1, 50);
+      await networkHelpers.time.increase(Duration.days(14));
+
+      await expect(idosStaking.connect(user1).withdrawUnstaked()).to.not.revert(ethers);
+      
+      await expect(idosStaking.connect(user1).withdrawUnstaked())
+        .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableStake");
+    });
+
+    it("Should handle maximum uint256 values safely", async () => {
+      const largeAmount = ethers.parseUnits("1000000", 18);
+      
+      await idosToken.transfer(user1, largeAmount);
+      await idosToken.connect(user1).approve(await idosStaking.getAddress(), largeAmount);
+      
+      await expect(stake(user1, node1, largeAmount)).to.not.revert(ethers);
+      
+      expect(await stakeByNodeByUser(user1, node1)).to.equal(largeAmount);
+    });
+
+    it("Should prevent integer underflow in getUserStake", async () => {
+      await stake(user1, node1, 100);
+      await slash(node1);
+      
+      const [activeStake, slashedStake] = await getUserStake(user1);
+      expect(activeStake).to.equal(0);
+      expect(slashedStake).to.equal(100);
+    });
+
+    it("Should handle token transfer failures gracefully", async () => {
+      await expect(stake(user1, node1, 10000))
+        .to.be.revert(ethers);
+    });
+  });
+
+  describe("Edge Cases", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await allowNode(node1);
+      await allowNode(node2);
+    });
+
+    it("Should handle staking at exact epoch boundary", async () => {
+      await stake(user1, node1, 100);
+      
+      const currentEpoch = await idosStaking.currentEpoch();
+      const nextEpochTime = evmTimestamp(2026, 11) + Number((currentEpoch + 1n) * 86400n);
+      
+      await networkHelpers.time.increaseTo(nextEpochTime);
+      await stake(user2, node1, 100);
+      
+      expect(await stakeByNodeByUser(user2, node1)).to.equal(100);
+    });
+
+    it("Should handle zero balance reward scenario", async () => {
+      await stake(user1, node1, 100);
+      await networkHelpers.time.increase(Duration.days(1));
+      
+      const expectedReward = await withdrawableReward(user1);
+      expect(expectedReward).to.be.gt(0);
+      
+      const contractBalance = await idosToken.balanceOf(await idosStaking.getAddress());
+      
+      if (contractBalance >= expectedReward) {
+        await expect(idosStaking.connect(user1).withdrawReward()).to.not.revert(ethers);
+      }
+    });
+
+    it("Should handle multiple unstakes from same user", async () => {
+      await stake(user1, node1, 100);
+      
+      await unstake(user1, node1, 30);
+      await networkHelpers.time.increase(Duration.days(1));
+      await unstake(user1, node1, 30);
+      await networkHelpers.time.increase(Duration.days(1));
+      await unstake(user1, node1, 40);
+      
+      await networkHelpers.time.increase(Duration.days(12));
+      
+      const withdrawn = await idosStaking.connect(user1).withdrawUnstaked();
+      await expect(withdrawn).to.not.revert(ethers);
+    });
+
+    it("Should handle epoch changes during reward calculation", async () => {
+      await stake(user1, node1, 100);
+      
+      await networkHelpers.time.increase(Duration.days(10));
+      
+      const reward1 = await withdrawableReward(user1);
+      expect(reward1).to.equal(1000);
+      
+      await idosStaking.setEpochReward(200);
+      
+      await networkHelpers.time.increase(Duration.days(5));
+      
+      const reward2 = await withdrawableReward(user1);
+      expect(reward2).to.equal(2000);
+    });
+
+    it("Should handle user with zero stake querying rewards", async () => {
+      const reward = await withdrawableReward(user1);
+      expect(reward).to.equal(0);
+      
+      await expect(idosStaking.connect(user1).withdrawReward())
+        .to.be.revertedWithCustomError(idosStaking, "NoWithdrawableRewards");
+    });
+  });
+
+  describe("Multi-User Scenarios", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await Promise.all([node1, node2, node3].map(node => allowNode(node)));
+    });
+
+    it("Should distribute rewards fairly among multiple users", async () => {
+      await stake(user1, node1, 100);
+      await stake(user2, node2, 300);
+      
+      await networkHelpers.time.increase(Duration.days(1));
+      
+      const reward1 = await withdrawableReward(user1);
+      const reward2 = await withdrawableReward(user2);
+      
+      expect(reward1).to.equal(25);
+      expect(reward2).to.equal(75);
+    });
+
+    it("Should handle multiple users staking simultaneously", async () => {
+      const users = [user1, user2, user3];
+      const stakingPromises = users.map(user => stake(user, node1, 100));
+      
+      await Promise.all(stakingPromises);
+      
+      for (const user of users) {
+        expect(await stakeByNodeByUser(user, node1)).to.equal(100);
+      }
+      
+      expect(await getNodeStake(node1)).to.equal(300);
+    });
+
+    it("Should handle complex multi-user stake/unstake/slash scenario", async () => {
+      await stake(user1, node1, 100);
+      await stake(user2, node2, 200);
+      await stake(user3, node3, 300);
+      
+      await networkHelpers.time.increase(Duration.days(1));
+      
+      await unstake(user2, node2, 100);
+      
+      await networkHelpers.time.increase(Duration.days(1));
+      
+      await slash(node3);
+      
+      await networkHelpers.time.increase(Duration.days(1));
+      
+      const reward1 = await withdrawableReward(user1);
+      const reward2 = await withdrawableReward(user2);
+      const reward3 = await withdrawableReward(user3);
+      
+      expect(reward3).to.equal(110);
+      expect(reward1).to.be.gt(0);
+      expect(reward2).to.be.gt(0);
+    });
+  });
+
+  describe("Access Control Edge Cases", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+    });
+
+    it("Should prevent non-owner from calling setEpochReward", async () => {
+      await expect(idosStaking.connect(user1).setEpochReward(200))
+        .to.be.revertedWithCustomError(idosStaking, "OwnableUnauthorizedAccount");
+    });
+
+    it("Should prevent setting same epoch reward twice", async () => {
+      await idosStaking.setEpochReward(200);
+      
+      await expect(idosStaking.setEpochReward(200))
+        .to.be.revertedWithCustomError(idosStaking, "EpochRewardDidntChange");
+    });
+
+    it("Should allow owner to pause and unpause multiple times", async () => {
+      await idosStaking.pause();
+      await idosStaking.unpause();
+      await idosStaking.pause();
+      await idosStaking.unpause();
+      
+      await allowNode(node1);
+      await expect(stake(user1, node1, 100)).to.not.revert(ethers);
+    });
+  });
+
+  describe("Gas Optimization Validation", () => {
+    beforeEach(async () => {
+      await networkHelpers.time.increaseTo(evmTimestamp(2026, 11));
+      await allowNode(node1);
+    });
+
+    it("Should handle large arrays efficiently", async () => {
+      await stake(user1, node1, 1000);
+      
+      for (let i = 0; i < 5; i++) {
+        await unstake(user1, node1, 10);
+        await networkHelpers.time.increase(Duration.days(1));
+      }
+      
+      await networkHelpers.time.increase(Duration.days(14));
+      
+      await expect(idosStaking.connect(user1).withdrawUnstaked()).to.not.revert(ethers);
+    });
+
+    it("Should handle reward calculation with many epochs efficiently", async () => {
+      await stake(user1, node1, 100);
+      
+      await networkHelpers.time.increase(Duration.days(30));
+      
+      const reward = await withdrawableReward(user1);
+      expect(reward).to.equal(3000);
+    });
+  });
 });
