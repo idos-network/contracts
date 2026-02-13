@@ -6,7 +6,11 @@ show_progress = true
 fs_permissions = [
     { access = "read-write", path = "./deployments.toml" }
 ]
+libs = ["dependencies"]
 
 [rpc_endpoints]
 arbitrum_one = "${ARBITRUM_ONE_RPC_URL}"
 arbitrum_one_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+
+[dependencies]
+"@openzeppelin-contracts" = "5.5.0"

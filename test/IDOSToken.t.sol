@@ -3,7 +3,7 @@
 pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IDOSToken} from "../contracts/IDOSToken.sol";
+import {IDOSToken} from "../src/IDOSToken.sol";
 
 contract IDOSTokenTest is Test {
     IDOSToken idosToken;

@@ -7,8 +7,8 @@ See the [Audit report](./NM0731-FINAL_IDOS.pdf)
 Install [Foundry](https://getfoundry.sh/) and dependencies:
 
 ```bash
-pnpm i                    # OpenZeppelin contracts (for remappings)
-forge install              # Ensure lib/forge-std is installed
+forge install
+forge soldeer install
 ```
 
 ## Build
