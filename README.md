@@ -1,6 +1,6 @@
 # Contracts
 
-See the [Audit report](./NM0731-FINAL_IDOS.pdf)
+See the [Audit report](./NM0731-FINAL_IDOS.pdf). It was added on [f0ba57e](https://github.com/idos-network/contracts/tree/f0ba57e502eb2eeef1ce19b2135366dfff230f26).
 
 ## Setup
 
@@ -25,7 +25,7 @@ forge test
 
 ## Deploy
 
-IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and Arbitrum Sepolia (421614). Addresses are in `deployments.toml` (migrated from Hardhat Ignition).
+IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and Arbitrum Sepolia (421614). Addresses are in `deployments.toml`.
 
 To run the deployment script (skips deployment on known chains, deploys otherwise):
 
@@ -38,6 +38,8 @@ INITIAL_OWNER=0x... forge script script/DeployIDOSNodeStaking.s.sol --rpc-url se
 ```
 
 ## Verify on Etherscan
+
+Should be done automatically by the deployment script, but can be done manually with:
 
 ```bash
 forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain arbitrum_one --etherscan-api-key $ETHERSCAN_API_KEY
