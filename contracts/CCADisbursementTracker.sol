@@ -56,11 +56,19 @@ contract CCADisbursementTracker is ERC20 {
     uint256 immutable _initialSupply;
 
     /// @notice Returns the CCA contract address.
-    function ccaContract() public view returns (address) { return _ccaContract; }
+    function ccaContract() public view returns (address) {
+        return _ccaContract;
+    }
+
     /// @notice Returns the disburser address.
-    function disburser() public view returns (address) { return _disburser; }
+    function disburser() public view returns (address) {
+        return _disburser;
+    }
+
     /// @notice Returns the initial supply minted at deployment.
-    function initialSupply() public view returns (uint256) { return _initialSupply; }
+    function initialSupply() public view returns (uint256) {
+        return _initialSupply;
+    }
 
     /// @dev Set to true after the initial mint in the constructor; prevents further minting.
     bool private _initialMintDone;
@@ -122,10 +130,14 @@ contract CCADisbursementTracker is ERC20 {
     uint256 private _totalMissingDisbursements;
     /// @dev Per-account amount of tokens sold that have not yet had disbursements recorded.
     mapping(address account => uint256 value) private _missingDisbursements;
+
     /// @notice A recorded disbursement with its amount and transaction reference.
     /// @param value Amount disbursed
     /// @param txHash Transaction hash where the on-chain disbursement occurred
-    struct Disbursement { uint256 value; bytes32 txHash; }
+    struct Disbursement {
+        uint256 value;
+        bytes32 txHash;
+    }
     /// @dev Per-account list of recorded disbursements for verification.
     mapping(address account => Disbursement[]) private _disbursements;
 
@@ -179,7 +191,11 @@ contract CCADisbursementTracker is ERC20 {
     /// @param offset Starting index (inclusive)
     /// @param count Number of items to return
     /// @return Disbursements in the requested range. Returns fewer than `count` if the range extends past the end.
-    function disbursementsToRange(address account, uint256 offset, uint256 count) external view returns (Disbursement[] memory) {
+    function disbursementsToRange(address account, uint256 offset, uint256 count)
+        external
+        view
+        returns (Disbursement[] memory)
+    {
         Disbursement[] storage arr = _disbursements[account];
         uint256 len = arr.length;
         if (offset >= len) return new Disbursement[](0);
@@ -189,9 +205,11 @@ contract CCADisbursementTracker is ERC20 {
         uint256 resultLen = end - offset;
 
         Disbursement[] memory result = new Disbursement[](resultLen);
-        for (uint256 i; i < resultLen; ) {
+        for (uint256 i; i < resultLen;) {
             result[i] = arr[offset + i];
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
         return result;
     }
@@ -201,17 +219,15 @@ contract CCADisbursementTracker is ERC20 {
     /// @param recipients Addresses to record disbursements for
     /// @param values Amounts disbursed to each recipient
     /// @param txHashes Transaction hashes where the on-chain disbursements occurred
-    function recordDisbursements(
-        address[] calldata recipients,
-        uint256[] calldata values,
-        bytes32[] calldata txHashes
-    ) external {
+    function recordDisbursements(address[] calldata recipients, uint256[] calldata values, bytes32[] calldata txHashes)
+        external
+    {
         if (!saleCompleted()) revert SaleNotCompleted();
         if (msg.sender != _disburser) revert OnlyDisburserCanRecordDisbursements();
         uint256 len = recipients.length;
         if (len != values.length || len != txHashes.length) revert ArrayLengthMismatch();
 
-        for (uint256 i; i < len; ) {
+        for (uint256 i; i < len;) {
             address to = recipients[i];
             uint256 value = values[i];
             if (to == address(0)) revert NoZeroAddressRecipientAllowed();
@@ -227,12 +243,19 @@ contract CCADisbursementTracker is ERC20 {
 
             emit DisbursementCompleted(to, value, txHashes[i]);
 
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 
     /// @dev Reverts; this contract does not accept ETH.
-    receive()  external payable { revert(); }
+    receive() external payable {
+        revert();
+    }
+
     /// @dev Reverts; this contract does not accept ETH.
-    fallback() external payable { revert(); }
+    fallback() external payable {
+        revert();
+    }
 }

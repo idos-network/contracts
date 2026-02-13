@@ -8,13 +8,9 @@
 # Foundry
 /out
 /cache
-/broadcast
+/broadcast/*/31337
+# Rely on the timestamped json files instead.
+/broadcast/*/*/run-latest.json
 
 # pnpm deploy output
 /bundle
-
-# Legacy Hardhat (kept for reference)
-/artifacts
-/types
-/coverage
-/ignition/deployments

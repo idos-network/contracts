@@ -25,22 +25,22 @@ forge test
 
 ## Deploy
 
-IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and Arbitrum Sepolia (421614). Addresses are in `script/deployments.json` (migrated from Hardhat Ignition).
+IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and Arbitrum Sepolia (421614). Addresses are in `deployments.toml` (migrated from Hardhat Ignition).
 
 To run the deployment script (skips deployment on known chains, deploys otherwise):
 
 ```bash
 # Load .env and run (Arbitrum One - will skip, already deployed)
-forge script script/DeployIDOSNodeStaking.s.sol --rpc-url arbitrumOne --broadcast
+forge script script/DeployIDOSNodeStaking.s.sol --rpc-url arbitrum_one --broadcast
 
 # Deploy to a new chain (requires INITIAL_OWNER in env)
-INITIAL_OWNER=0x... forge script script/DeployIDOSNodeStaking.s.sol --rpc-url sepolia --broadcast
+INITIAL_OWNER=0x... forge script script/DeployIDOSNodeStaking.s.sol --rpc-url sepolia --broadcast --verify
 ```
 
 ## Verify on Etherscan
 
 ```bash
-forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain-id 42161 --etherscan-api-key $ETHERSCAN_API_KEY
+forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain arbitrum_one --etherscan-api-key $ETHERSCAN_API_KEY
 ```
 
 See also gas experiments here: https://github.com/idos-network/node-staking-gas-tests

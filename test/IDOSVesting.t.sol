@@ -24,12 +24,7 @@ contract IDOSVestingTest is Test {
         uint256 vestingDuration = 100 days;
         uint256 cliffDuration = 0;
 
-        idosVesting = new IDOSVesting(
-            alice,
-            uint64(start),
-            uint64(vestingDuration),
-            uint64(cliffDuration)
-        );
+        idosVesting = new IDOSVesting(alice, uint64(start), uint64(vestingDuration), uint64(cliffDuration));
 
         vm.prank(owner);
         idosToken.transfer(address(idosVesting), 100);
@@ -66,12 +61,7 @@ contract IDOSVestingTest is Test {
         uint256 vestingDuration = 100 days;
         uint256 cliffDuration = 10 days;
 
-        idosVesting = new IDOSVesting(
-            alice,
-            uint64(start),
-            uint64(vestingDuration),
-            uint64(cliffDuration)
-        );
+        idosVesting = new IDOSVesting(alice, uint64(start), uint64(vestingDuration), uint64(cliffDuration));
 
         vm.prank(owner);
         idosToken.transfer(address(idosVesting), 100);

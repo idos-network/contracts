@@ -32,12 +32,7 @@ contract IDOSNodeStakingTest is Test {
         vm.prank(owner);
         idosToken = new IDOSToken(owner);
 
-        idosStaking = new IDOSNodeStaking(
-            address(idosToken),
-            owner,
-            uint48(START_TIME),
-            EPOCH_REWARD
-        );
+        idosStaking = new IDOSNodeStaking(address(idosToken), owner, uint48(START_TIME), EPOCH_REWARD);
 
         vm.prank(owner);
         idosToken.transfer(address(idosStaking), 10_000);
@@ -83,9 +78,7 @@ contract IDOSNodeStakingTest is Test {
         idosStaking.pause();
 
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
         idosStaking.pause();
     }
 
@@ -172,9 +165,7 @@ contract IDOSNodeStakingTest is Test {
         allowNode(node1);
 
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
         idosStaking.allowNode(node1);
     }
 
@@ -184,9 +175,7 @@ contract IDOSNodeStakingTest is Test {
         idosStaking.disallowNode(node1);
 
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
         idosStaking.disallowNode(node1);
     }
 
@@ -234,26 +223,20 @@ contract IDOSNodeStakingTest is Test {
         vm.warp(START_TIME);
         stake(user1, node1, 1);
         slash(node1);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsSlashed(address)", node1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsSlashed(address)", node1));
         stake(user1, node1, 100);
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstNonAllowedNode() public {
         vm.warp(START_TIME);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsNotAllowed(address)", node1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsNotAllowed(address)", node1));
         stake(user1, node1, 100);
     }
 
     function test_Staking_AfterStarting_CanOnlyStakePositiveAmounts() public {
         allowNode(node1);
         vm.warp(START_TIME);
-        vm.expectRevert(
-            abi.encodeWithSignature("AmountNotPositive(uint256)", 0)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
         stake(user1, node1, 0);
     }
 
@@ -324,9 +307,7 @@ contract IDOSNodeStakingTest is Test {
         vm.warp(START_TIME);
         stake(user1, node1, 100);
         slash(node1);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsSlashed(address)", node1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsSlashed(address)", node1));
         unstake(user1, node1, 100);
     }
 
@@ -335,9 +316,7 @@ contract IDOSNodeStakingTest is Test {
         vm.warp(START_TIME);
         stake(user1, node1, 100);
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("AmountNotPositive(uint256)", 0)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
         idosStaking.unstake(node1, 0);
     }
 
@@ -346,9 +325,7 @@ contract IDOSNodeStakingTest is Test {
         vm.warp(START_TIME);
         stake(user1, node1, 100);
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("AmountExceedsStake(uint256,uint256)", 1000, 100)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AmountExceedsStake(uint256,uint256)", 1000, 100));
         idosStaking.unstake(node1, 1000);
         assertEq(idosStaking.stakeByNodeByUser(user1, node1), 100);
 
@@ -424,16 +401,12 @@ contract IDOSNodeStakingTest is Test {
 
     function test_Slashing_UnknownNodesCantBeSlashed() public {
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsUnknown(address)", node1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsUnknown(address)", node1));
         idosStaking.slash(node1);
 
         address randomAddr = makeAddr("random");
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsUnknown(address)", randomAddr)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsUnknown(address)", randomAddr));
         idosStaking.slash(randomAddr);
     }
 
@@ -443,9 +416,7 @@ contract IDOSNodeStakingTest is Test {
         stake(user1, node1, 100);
         slash(node1);
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSignature("NodeIsSlashed(address)", node1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("NodeIsSlashed(address)", node1));
         idosStaking.slash(node1);
     }
 
@@ -456,9 +427,7 @@ contract IDOSNodeStakingTest is Test {
         vm.prank(owner);
         idosStaking.slash(node1);
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
         idosStaking.slash(node1);
     }
 
@@ -470,9 +439,7 @@ contract IDOSNodeStakingTest is Test {
         vm.prank(owner);
         idosStaking.withdrawSlashedStakes();
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1)
-        );
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
         idosStaking.withdrawSlashedStakes();
     }
 
@@ -497,9 +464,7 @@ contract IDOSNodeStakingTest is Test {
         idosStaking.withdrawSlashedStakes();
         assertEq(idosToken.balanceOf(owner), prevBalance + 100);
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSignature("NoWithdrawableSlashedStakes()")
-        );
+        vm.expectRevert(abi.encodeWithSignature("NoWithdrawableSlashedStakes()"));
         idosStaking.withdrawSlashedStakes();
     }
 
