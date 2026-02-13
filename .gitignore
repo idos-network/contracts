@@ -3,23 +3,18 @@
 
 # Node modules
 /node_modules
+/.pnpm-store
 
-# Compilation output
-/dist
+# Foundry
+/out
+/cache
+/broadcast
 
 # pnpm deploy output
 /bundle
 
-# Hardhat Build Artifacts
+# Legacy Hardhat (kept for reference)
 /artifacts
-
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
 /types
-
-# Hardhat coverage reports
 /coverage
-
 /ignition/deployments
