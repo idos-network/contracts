@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// cSpell:words idOS
 pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
@@ -15,19 +16,20 @@ contract IDOSTokenTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         alice = makeAddr("alice");
+
         vm.prank(owner);
         idosToken = new IDOSToken(owner);
     }
 
-    function test_Premint1BTokens() public view {
+    function test_PreMint1BTokens() public view {
         assertEq(idosToken.totalSupply(), TOTAL_SUPPLY);
     }
 
-    function test_NoMinting() public view {
-        // IDOSToken has no public mint - verify by checking it doesn't exist
-        // (We could try to call a non-existent function - Solidity would fail at compile time
-        // if we tried to call mint. As a behavioral test, we check totalSupply is fixed.)
-        assertEq(idosToken.totalSupply(), TOTAL_SUPPLY);
+    function test_NoMinting() public {
+        (bool success,) = address(idosToken).call(
+            abi.encodeWithSignature("mint(address,uint256)", owner, 1)
+        );
+        assertFalse(success);
     }
 
     function test_AllowBurning() public {
