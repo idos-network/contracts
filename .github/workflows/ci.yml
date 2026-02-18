@@ -18,6 +18,14 @@ jobs:
         with:
           version: stable
 
+      - name: Cache Soldeer dependencies
+        uses: actions/cache@v4
+        with:
+          path: dependencies
+          key: soldeer-${{ runner.os }}-${{ hashFiles('soldeer.lock') }}
+          restore-keys: |
+            soldeer-${{ runner.os }}-
+
       - run: forge soldeer install
 
       - run: forge build
