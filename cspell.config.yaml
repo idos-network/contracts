@@ -1,0 +1,18 @@
+version: "0.2"
+dictionaries:
+  - project-words
+  - english
+  - ethereum
+  - bash
+  - linux
+dictionaryDefinitions:
+  - name: project-words
+    path: ./project-words.txt
+    addWords: true
+ignorePaths:
+  - "cspell.config.yaml"
+  - "**/.gitignore"
+  - "out/**"
+  - "lib/**"
+  - "dependencies/**"
+  - "cache/**"
