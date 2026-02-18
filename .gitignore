@@ -1,10 +1,6 @@
 # Env variables file
 .env
 
-# Node modules
-/node_modules
-/.pnpm-store
-
 # Soldeer
 /dependencies
 
