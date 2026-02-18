@@ -35,5 +35,3 @@ jobs:
       - run: forge build
 
       - run: forge test
-
-      - run: forge test --gas-report
