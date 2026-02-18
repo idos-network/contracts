@@ -80,20 +80,20 @@ contract CCADisbursementTracker is ERC20 {
     /// @notice Constructs the CCADisbursementTracker and mints the initial supply to the CCA contract.
     /// @param name ERC20 token name.
     /// @param symbol ERC20 token symbol.
-    /// @param initialSupply Total supply to mint; must match the CCA's totalSupply requirement.
-    /// @param ccaContract Address of the CCA contract that will hold and sell the tokens.
-    /// @param disburser Address authorized to record disbursements after the sale completes.
-    constructor(string memory name, string memory symbol, uint256 initialSupply, address ccaContract, address disburser)
+    /// @param initialSupply_ Total supply to mint; must match the CCA's totalSupply requirement.
+    /// @param ccaContract_ Address of the CCA contract that will hold and sell the tokens.
+    /// @param disburser_ Address authorized to record disbursements after the sale completes.
+    constructor(string memory name, string memory symbol, uint256 initialSupply_, address ccaContract_, address disburser_)
         ERC20(name, symbol)
     {
-        if (ccaContract == address(0)) revert ZeroAddressCCAContract();
-        if (disburser == address(0)) revert ZeroAddressDisburser();
-        if (initialSupply == 0) revert NoInitialSupply();
+        if (ccaContract_ == address(0)) revert ZeroAddressCCAContract();
+        if (disburser_ == address(0)) revert ZeroAddressDisburser();
+        if (initialSupply_ == 0) revert NoInitialSupply();
 
-        _ccaContract = ccaContract;
-        _disburser = disburser;
-        _initialSupply = initialSupply;
-        super._mint(ccaContract, initialSupply);
+        _ccaContract = ccaContract_;
+        _disburser = disburser_;
+        _initialSupply = initialSupply_;
+        super._mint(ccaContract_, initialSupply_);
         _initialMintDone = true;
     }
 

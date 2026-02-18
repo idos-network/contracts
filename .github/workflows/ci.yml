@@ -14,9 +14,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Read Foundry version
+        id: foundry-version
+        run: echo "version=$(cat .foundry-version)" >> $GITHUB_OUTPUT
+
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: ${{ steps.foundry-version.outputs.version }}
 
       - name: Cache Soldeer dependencies
         uses: actions/cache@v4

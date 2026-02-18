@@ -4,9 +4,10 @@ See the [Audit report](./NM0731-FINAL_IDOS.pdf). It was added on [f0ba57e](https
 
 ## Setup
 
-Install [Foundry](https://getfoundry.sh/) and dependencies:
+Install [Foundry](https://getfoundry.sh/) at the version used by this repo, then install dependencies:
 
 ```bash
+foundryup -i $(cat .foundry-version)
 forge install
 forge soldeer install
 ```
