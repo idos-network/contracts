@@ -7,14 +7,16 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract IDOSToken is ERC20, ERC20Burnable, ERC20Permit {
-    constructor(address initialTreasury)
-        ERC20("IDOSToken", "IDOS")
-        ERC20Permit("IDOSToken")
-    {
+    constructor(address initialTreasury) ERC20("IDOSToken", "IDOS") ERC20Permit("IDOSToken") {
         _mint(initialTreasury, 1_000_000_000 * 10 ** decimals());
     }
 
     // Prevent accidental ETH transfers
-    receive() external payable { revert(); }
-    fallback() external payable { revert(); }
+    receive() external payable {
+        revert();
+    }
+
+    fallback() external payable {
+        revert();
+    }
 }

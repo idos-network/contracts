@@ -26,9 +26,7 @@ contract IDOSTokenTest is Test {
     }
 
     function test_NoMinting() public {
-        (bool success,) = address(idosToken).call(
-            abi.encodeWithSignature("mint(address,uint256)", owner, 1)
-        );
+        (bool success,) = address(idosToken).call(abi.encodeWithSignature("mint(address,uint256)", owner, 1));
         assertFalse(success);
     }
 

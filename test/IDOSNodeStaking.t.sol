@@ -440,8 +440,8 @@ contract IDOSNodeStakingTest is Test {
     // --- Slashing ---
 
     function _slashing() public {
-      vm.warp(START_TIME);
-      allowNode(node1);
+        vm.warp(START_TIME);
+        allowNode(node1);
     }
 
     function test_Slashing_UnknownNodesCantBeSlashed() public {
