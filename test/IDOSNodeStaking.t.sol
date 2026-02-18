@@ -33,16 +33,17 @@ contract IDOSNodeStakingTest is Test {
         vm.prank(owner);
         idosToken = new IDOSToken(owner);
 
+        // forge-lint: disable-next-line(unsafe-typecast) -- START_TIME fits in uint48
         idosStaking = new IDOSNodeStaking(address(idosToken), owner, uint48(START_TIME), EPOCH_REWARD);
 
         vm.prank(owner);
-        idosToken.transfer(address(idosStaking), 10_000);
+        require(idosToken.transfer(address(idosStaking), 10_000));
 
         address[] memory users = new address[](3);
         (users[0], users[1], users[2]) = (user1, user2, user3);
         for (uint256 i = 0; i < users.length; i++) {
             vm.prank(owner);
-            idosToken.transfer(users[i], 1_000);
+            require(idosToken.transfer(users[i], 1_000));
             vm.prank(users[i]);
             idosToken.approve(address(idosStaking), 1_000);
         }
@@ -234,23 +235,22 @@ contract IDOSNodeStakingTest is Test {
 
         for (uint256 i = 0; i < 10; i++) {
             assertEq(idosStaking.currentEpoch(), i * 100);
-            vm.warp(START_TIME + (i + 1) * 100 days);
+            skip(100 days);
         }
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstZeroAddress() public {
         _stakingAfterStarting();
 
-        vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("ZeroAddressNode()"));
-
-        idosStaking.stake(address(0), address(0), 100);
+        stake(user1, address(0), 100);
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstSlashedNode() public {
         _stakingAfterStarting();
 
         allowNode(node1);
+
         stake(user1, node1, 1);
         slash(node1);
 
@@ -269,6 +269,7 @@ contract IDOSNodeStakingTest is Test {
         _stakingAfterStarting();
 
         allowNode(node1);
+
         vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
         stake(user1, node1, 0);
     }
@@ -342,9 +343,8 @@ contract IDOSNodeStakingTest is Test {
     function test_Unstaking_AfterStarting_CantUnstakeFromZeroAddress() public {
         _unstakingAfterStarting();
 
-        vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("ZeroAddressNode()"));
-        idosStaking.unstake(address(0), 100);
+        unstake(user1, address(0), 100);
     }
 
     function test_Unstaking_AfterStarting_CantUnstakeFromSlashedNode() public {
@@ -359,9 +359,8 @@ contract IDOSNodeStakingTest is Test {
     function test_Unstaking_AfterStarting_CanOnlyUnstakePositiveAmounts() public {
         _unstakingAfterStarting();
 
-        vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
-        idosStaking.unstake(node1, 0);
+        unstake(user1, node1, 0);
     }
 
     function test_Unstaking_AfterStarting_CanOnlyUnstakeUpToStakedAmount() public {
@@ -373,6 +372,7 @@ contract IDOSNodeStakingTest is Test {
         assertEq(idosStaking.stakeByNodeByUser(user1, node1), 100);
 
         stake(user1, node1, 900);
+
         unstake(user1, node1, 1000);
 
         assertEq(idosStaking.stakeByNodeByUser(user1, node1), 0);
@@ -408,7 +408,11 @@ contract IDOSNodeStakingTest is Test {
 
         unstake(user1, node1, 100);
 
-        skip(15 days); // !!!: was 14 in the original tests.
+        // Pretend we mined a new block.
+        vm.roll(block.number + 1);
+        skip(1 seconds);
+
+        skip(idosStaking.UNSTAKE_DELAY());
 
         vm.expectEmit();
         emit IDOSNodeStaking.UnstakedWithdraw(user1, 100);
@@ -424,7 +428,10 @@ contract IDOSNodeStakingTest is Test {
 
         unstake(user1, node1, 10);
 
-        skip(14 days); // !!!: was 13 in the original tests.
+        // Due to the use of strict inequality in the contract and the fact that
+        // Forge tests do not automatically mine blocks or advance their timestamps,
+        // we add 1 second for the unstake delay to have fully elapsed.
+        skip(13 days + 1 seconds);
 
         withdrawUnstaked(user1);
 
@@ -447,14 +454,12 @@ contract IDOSNodeStakingTest is Test {
     function test_Slashing_UnknownNodesCantBeSlashed() public {
         _slashing();
 
-        vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("NodeIsUnknown(address)", node1));
-        idosStaking.slash(node1);
+        slash(node1);
 
         address randomAddr = makeAddr("random");
-        vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("NodeIsUnknown(address)", randomAddr));
-        idosStaking.slash(randomAddr);
+        slash(randomAddr);
     }
 
     function test_Slashing_SlashedNodesCantBeSlashed() public {
@@ -463,9 +468,8 @@ contract IDOSNodeStakingTest is Test {
         stake(user1, node1, 100);
         slash(node1);
 
-        vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("NodeIsSlashed(address)", node1));
-        idosStaking.slash(node1);
+        slash(node1);
     }
 
     function test_Slashing_KnownNodesCanBeSlashedOnlyByOwner() public {
