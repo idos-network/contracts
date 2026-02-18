@@ -120,18 +120,18 @@ contract IDOSNodeStakingTest is Test {
         idosStaking.pause();
     }
 
-    function setup_WhenPaused() public {
+    function _whenPaused() public {
         pause();
     }
 
     function test_WhenPaused_CanBeUnpausedByOwner() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         unpause();
     }
 
     function test_Pause_WhenPaused_CantAllowNode() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
@@ -139,7 +139,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Pause_WhenPaused_CantDisallowNode() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
@@ -147,21 +147,21 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Pause_WhenPaused_CantStake() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         stake(user1, node1, 100);
     }
 
     function test_Pause_WhenPaused_CantUnstake() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         unstake(user1, node1, 100);
     }
 
     function test_Pause_WhenPaused_CantWithdrawUnstaked() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
@@ -169,7 +169,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Pause_WhenPaused_CantWithdrawSlashedStakes() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
@@ -177,7 +177,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Pause_WhenPaused_CantWithdrawReward() public {
-        setup_WhenPaused();
+        _whenPaused();
 
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
@@ -223,12 +223,12 @@ contract IDOSNodeStakingTest is Test {
         stake(user1, node1, 100);
     }
 
-    function setup_Staking_AfterStarting() public {
+    function _stakingAfterStarting() public {
         vm.warp(START_TIME);
     }
 
     function test_Staking_AfterStarting_EpochsLast1Day() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         assertEq(idosStaking.EPOCH_LENGTH(), 1 days);
 
@@ -239,7 +239,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstZeroAddress() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("ZeroAddressNode()"));
@@ -248,7 +248,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstSlashedNode() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         allowNode(node1);
         stake(user1, node1, 1);
@@ -259,14 +259,14 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Staking_AfterStarting_CantStakeAgainstNonAllowedNode() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         vm.expectRevert(abi.encodeWithSignature("NodeIsNotAllowed(address)", node1));
         stake(user1, node1, 100);
     }
 
     function test_Staking_AfterStarting_CanOnlyStakePositiveAmounts() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         allowNode(node1);
         vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
@@ -274,7 +274,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Staking_AfterStarting_EmitsEvents() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         allowNode(node1);
 
@@ -284,7 +284,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Staking_AfterStarting_Works() public {
-        setup_Staking_AfterStarting();
+        _stakingAfterStarting();
 
         allowNode(node1);
         allowNode(node2);
@@ -333,14 +333,14 @@ contract IDOSNodeStakingTest is Test {
         unstake(user1, node1, 100);
     }
 
-    function setup_Unstaking_AfterStarting() public {
+    function _unstakingAfterStarting() public {
         vm.warp(START_TIME);
         allowNode(node1);
         stake(user1, node1, 100);
     }
 
     function test_Unstaking_AfterStarting_CantUnstakeFromZeroAddress() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("ZeroAddressNode()"));
@@ -348,7 +348,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_CantUnstakeFromSlashedNode() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         slash(node1);
 
@@ -357,7 +357,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_CanOnlyUnstakePositiveAmounts() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSignature("AmountNotPositive(uint256)", 0));
@@ -365,7 +365,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_CanOnlyUnstakeUpToStakedAmount() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         vm.expectRevert(abi.encodeWithSignature("AmountExceedsStake(uint256,uint256)", 1000, 100));
         unstake(user1, node1, 1000);
@@ -379,7 +379,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_EmitsEvents() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         vm.expectEmit();
         emit IDOSNodeStaking.Unstaked(user1, node1, 100);
@@ -387,7 +387,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_Works() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         unstake(user1, node1, 10);
 
@@ -395,7 +395,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_Withdrawal_CantWithdrawBeforeDelay() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         unstake(user1, node1, 10);
 
@@ -404,7 +404,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_Withdrawal_EmitsEvents() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         unstake(user1, node1, 100);
 
@@ -416,7 +416,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Unstaking_AfterStarting_Withdrawal_Works() public {
-        setup_Unstaking_AfterStarting();
+        _unstakingAfterStarting();
 
         unstake(user1, node1, 10);
 
@@ -439,13 +439,13 @@ contract IDOSNodeStakingTest is Test {
 
     // --- Slashing ---
 
-    function setup_Slashing() public {
+    function _slashing() public {
       vm.warp(START_TIME);
       allowNode(node1);
     }
 
     function test_Slashing_UnknownNodesCantBeSlashed() public {
-        setup_Slashing();
+        _slashing();
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSignature("NodeIsUnknown(address)", node1));
@@ -458,7 +458,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Slashing_SlashedNodesCantBeSlashed() public {
-        setup_Slashing();
+        _slashing();
 
         stake(user1, node1, 100);
         slash(node1);
@@ -469,7 +469,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Slashing_KnownNodesCanBeSlashedOnlyByOwner() public {
-        setup_Slashing();
+        _slashing();
 
         stake(user1, node1, 100);
 
@@ -480,15 +480,15 @@ contract IDOSNodeStakingTest is Test {
         idosStaking.slash(node1);
     }
 
-    function setup_Slashing_WithdrawingSlashedStakes() public {
-        setup_Slashing();
+    function _slashingWithdrawingSlashedStakes() public {
+        _slashing();
 
         stake(user1, node1, 100);
         slash(node1);
     }
 
     function test_Slashing_WithdrawingSlashedStakes_CanBeDoneOnlyByOwner() public {
-        setup_Slashing_WithdrawingSlashedStakes();
+        _slashingWithdrawingSlashedStakes();
 
         withdrawSlashedStakes();
 
@@ -498,7 +498,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Slashing_WithdrawingSlashedStakes_EmitsEvents() public {
-        setup_Slashing_WithdrawingSlashedStakes();
+        _slashingWithdrawingSlashedStakes();
 
         vm.expectEmit();
         emit IDOSNodeStaking.SlashedWithdraw(100);
@@ -506,7 +506,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Slashing_WithdrawingSlashedStakes_Works() public {
-        setup_Slashing_WithdrawingSlashedStakes();
+        _slashingWithdrawingSlashedStakes();
 
         uint256 prevBalance = idosToken.balanceOf(owner);
         withdrawSlashedStakes();
@@ -518,7 +518,7 @@ contract IDOSNodeStakingTest is Test {
 
     // --- Rewards ---
 
-    function setup_Rewards() public {
+    function _rewards() public {
         vm.warp(START_TIME);
         allowNode(node1);
         allowNode(node2);
@@ -528,13 +528,13 @@ contract IDOSNodeStakingTest is Test {
     // Ensure sniping prevention: first staker in epoch
     // could otherwise immediately withdraw all rewards
     function test_Rewards_CountOnlyPastEpochs() public {
-        setup_Rewards();
+        _rewards();
 
         assertEq(withdrawableReward(user1), 0);
     }
 
     function test_Rewards_IgnoreSlashedStakes() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 50);
         stake(user1, node2, 50);
@@ -547,7 +547,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Rewards_ChangesValueAccordingToEpochReward() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 100);
         // Set to 100 at constructor
@@ -563,7 +563,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Rewards_ChangesValueAndKeepsTrackOfPastEpochRewards() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 100);
         // Set to 100 at constructor
@@ -581,7 +581,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Rewards_WorksI() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 100);
         stake(user2, node1, 300);
@@ -600,7 +600,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Rewards_WorksII() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 50);
         stake(user1, node2, 50);
@@ -644,7 +644,7 @@ contract IDOSNodeStakingTest is Test {
     }
 
     function test_Rewards_WorksIII() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 50);
         stake(user1, node2, 50);
@@ -684,7 +684,7 @@ contract IDOSNodeStakingTest is Test {
 
     // PoC from audit — should pass this test
     function test_Rewards_EpochRewardsComputation() public {
-        setup_Rewards();
+        _rewards();
 
         stake(user1, node1, 100);
 
