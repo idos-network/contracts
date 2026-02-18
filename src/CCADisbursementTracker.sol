@@ -49,25 +49,25 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract CCADisbursementTracker is ERC20 {
     /// @notice Address of the CCA contract; only this address can hold tokens.
-    address immutable _ccaContract;
+    address immutable _CCA_CONTRACT;
     /// @notice Address authorized to record disbursements after the sale is completed.
-    address immutable _disburser;
+    address immutable _DISBURSER;
     /// @notice Total supply minted at deployment; must match the CCA's totalSupply requirement.
-    uint256 immutable _initialSupply;
+    uint256 immutable _INITIAL_SUPPLY;
 
     /// @notice Returns the CCA contract address.
     function ccaContract() public view returns (address) {
-        return _ccaContract;
+        return _CCA_CONTRACT;
     }
 
     /// @notice Returns the disburser address.
     function disburser() public view returns (address) {
-        return _disburser;
+        return _DISBURSER;
     }
 
     /// @notice Returns the initial supply minted at deployment.
     function initialSupply() public view returns (uint256) {
-        return _initialSupply;
+        return _INITIAL_SUPPLY;
     }
 
     /// @dev Set to true after the initial mint in the constructor; prevents further minting.
@@ -94,9 +94,9 @@ contract CCADisbursementTracker is ERC20 {
         if (disburser_ == address(0)) revert ZeroAddressDisburser();
         if (initialSupply_ == 0) revert NoInitialSupply();
 
-        _ccaContract = ccaContract_;
-        _disburser = disburser_;
-        _initialSupply = initialSupply_;
+        _CCA_CONTRACT = ccaContract_;
+        _DISBURSER = disburser_;
+        _INITIAL_SUPPLY = initialSupply_;
         super._mint(ccaContract_, initialSupply_);
         _initialMintDone = true;
     }
@@ -110,12 +110,12 @@ contract CCADisbursementTracker is ERC20 {
     ///      - Initial mint to the CCA contract
     ///      - Burns when the CCA transfers to a holder (sale), which records missing disbursements
     function _update(address from, address to, uint256 value) internal virtual override {
-        if (from == address(0) && to == _ccaContract && !_initialMintDone) return super._update(from, to, value); // mint
+        if (from == address(0) && to == _CCA_CONTRACT && !_initialMintDone) return super._update(from, to, value); // mint
         if (from == address(0) && _initialMintDone) revert InitialMintAlreadyDone();
 
-        if (from == _ccaContract && to == _ccaContract) revert CCASelfTransferNotAllowed();
-        if (from == _ccaContract && to == address(0)) revert SimpleBurnsNotAllowed();
-        if (from == _ccaContract) {
+        if (from == _CCA_CONTRACT && to == _CCA_CONTRACT) revert CCASelfTransferNotAllowed();
+        if (from == _CCA_CONTRACT && to == address(0)) revert SimpleBurnsNotAllowed();
+        if (from == _CCA_CONTRACT) {
             super._update(from, address(0), value); // burn sold tokens
             _recordMissingDisbursement(to, value); // register missing disbursement
             return;
@@ -227,7 +227,7 @@ contract CCADisbursementTracker is ERC20 {
         external
     {
         if (!saleCompleted()) revert SaleNotCompleted();
-        if (msg.sender != _disburser) revert OnlyDisburserCanRecordDisbursements();
+        if (msg.sender != _DISBURSER) revert OnlyDisburserCanRecordDisbursements();
         uint256 len = recipients.length;
         if (len != values.length || len != txHashes.length) revert ArrayLengthMismatch();
 
@@ -243,7 +243,7 @@ contract CCADisbursementTracker is ERC20 {
                 _missingDisbursements[to] -= value;
             }
             _totalMissingDisbursements -= value;
-            _disbursements[to].push(Disbursement(value, txHashes[i]));
+            _disbursements[to].push(Disbursement({value: value, txHash: txHashes[i]}));
 
             emit DisbursementCompleted(to, value, txHashes[i]);
 

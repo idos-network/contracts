@@ -5,7 +5,6 @@ pragma solidity ^0.8.27;
 import {Script, console} from "forge-std/Script.sol";
 import {Config} from "forge-std/Config.sol";
 import {IDOSToken} from "../src/IDOSToken.sol";
-import {IDOSNodeStaking} from "../src/IDOSNodeStaking.sol";
 
 /// @notice Deployment script for IDOSToken and IDOSNodeStaking.
 /// @dev Uses forge-std Config with deployments.toml for address lookup.
