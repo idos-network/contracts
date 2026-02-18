@@ -1,25 +1,15 @@
 # Env variables file
 .env
 
-# Node modules
-/node_modules
+# Soldeer
+/dependencies
 
-# Compilation output
-/dist
+# Foundry
+/out
+/cache
+/broadcast/*/31337
+# Rely on the timestamped json files instead.
+/broadcast/*/*/run-latest.json
 
 # pnpm deploy output
 /bundle
-
-# Hardhat Build Artifacts
-/artifacts
-
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
-/types
-
-# Hardhat coverage reports
-/coverage
-
-/ignition/deployments

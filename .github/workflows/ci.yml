@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read Foundry version
+        id: foundry-version
+        run: echo "version=$(cat .foundry-version)" >> $GITHUB_OUTPUT
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: ${{ steps.foundry-version.outputs.version }}
+
+      - name: Cache Soldeer dependencies
+        uses: actions/cache@v4
+        with:
+          path: dependencies
+          key: soldeer-${{ runner.os }}-${{ hashFiles('soldeer.lock') }}
+          restore-keys: |
+            soldeer-${{ runner.os }}-
+
+      - run: forge soldeer install
+
+      - run: forge build
+
+      - run: forge test

@@ -40,8 +40,16 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
     IERC20 public immutable idosToken;
     uint256 public slashedStakeWithdrawn;
 
-    struct Unstake { uint256 amount; uint48 timestamp; }
-    struct NodeStake { address node; uint256 stake; }
+    struct Unstake {
+        uint256 amount;
+        uint48 timestamp;
+    }
+
+    struct NodeStake {
+        address node;
+        uint256 stake;
+    }
+
     struct EpochCheckpoint {
         uint48 epoch;
         uint256 rewardAcc;
@@ -85,25 +93,19 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         epochRewardHistory.push(0, epochReward_);
     }
 
-    function allowNode(address node)
-        external whenNotPaused onlyOwner
-    {
+    function allowNode(address node) external whenNotPaused onlyOwner {
         allowlistedNodes.add(node);
 
         emit Allowed(node);
     }
 
-    function disallowNode(address node)
-        external whenNotPaused onlyOwner
-    {
+    function disallowNode(address node) external whenNotPaused onlyOwner {
         allowlistedNodes.remove(node);
 
         emit Disallowed(node);
     }
 
-    function stake(address user, address node, uint256 amount)
-        external nonReentrant whenNotPaused
-    {
+    function stake(address user, address node, uint256 amount) external nonReentrant whenNotPaused {
         require(node != address(0), ZeroAddressNode());
         require(allowlistedNodes.contains(node), NodeIsNotAllowed(node));
         require(!slashedNodes.contains(node), NodeIsSlashed(node));
@@ -133,9 +135,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit Staked(user, node, amount);
     }
 
-    function unstake(address node, uint256 amount)
-        external nonReentrant whenNotPaused
-    {
+    function unstake(address node, uint256 amount) external nonReentrant whenNotPaused {
         require(node != address(0), ZeroAddressNode());
         require(!slashedNodes.contains(node), NodeIsSlashed(node));
         require(amount > 0, AmountNotPositive(amount));
@@ -171,16 +171,14 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit Unstaked(msg.sender, node, amount);
     }
 
-    function withdrawUnstaked()
-        external nonReentrant whenNotPaused
-        returns (uint256 withdrawableAmount)
-    {
+    function withdrawUnstaked() external nonReentrant whenNotPaused returns (uint256 withdrawableAmount) {
         withdrawableAmount;
-        for (uint i; i < unstakesByUser[msg.sender].length; i++)
+        for (uint256 i; i < unstakesByUser[msg.sender].length; i++) {
             if (unstakesByUser[msg.sender][i].timestamp < uint48(block.timestamp) - UNSTAKE_DELAY) {
                 withdrawableAmount += unstakesByUser[msg.sender][i].amount;
                 delete unstakesByUser[msg.sender][i];
             }
+        }
 
         require(withdrawableAmount > 0, NoWithdrawableStake());
 
@@ -189,9 +187,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit UnstakedWithdraw(msg.sender, withdrawableAmount);
     }
 
-    function slash(address node)
-        external onlyOwner nonReentrant whenNotPaused
-    {
+    function slash(address node) external onlyOwner nonReentrant whenNotPaused {
         require(node != address(0), ZeroAddressNode());
         require(stakeByNode.contains(node), NodeIsUnknown(node));
         require(!slashedNodes.contains(node), NodeIsSlashed(node));
@@ -202,14 +198,13 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit Slashed(node, getNodeStake(node));
     }
 
-    function withdrawSlashedStakes()
-        external onlyOwner nonReentrant whenNotPaused
-    {
+    function withdrawSlashedStakes() external onlyOwner nonReentrant whenNotPaused {
         NodeStake[] memory slashedStakes = getSlashedNodeStakes();
 
         uint256 amount;
-        for (uint i; i < slashedStakes.length; i++)
+        for (uint256 i; i < slashedStakes.length; i++) {
             amount += slashedStakes[i].stake;
+        }
 
         amount -= slashedStakeWithdrawn;
         require(amount > 0, NoWithdrawableSlashedStakes());
@@ -223,7 +218,8 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
 
     // TODO nodes should be able to set a % they take from delegates
     function withdrawableReward(address user)
-        public view
+        public
+        view
         returns (uint256 withdrawableAmount, uint256 rewardAcc, uint256 userStakeAcc, uint256 totalStakeAcc)
     {
         EpochCheckpoint memory checkpoint = epochCheckpointByUser[user];
@@ -241,7 +237,7 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
             totalStakeAcc -= unstakedByEpoch[i];
 
             address[] memory slashedNodesThisEpoch = slashesByEpoch[i].values();
-            for (uint j; j < slashedNodesThisEpoch.length; j++) {
+            for (uint256 j; j < slashedNodesThisEpoch.length; j++) {
                 userStakeAcc -= stakeByNodeByUser[user][slashedNodesThisEpoch[j]];
                 totalStakeAcc -= stakeByNode.get(slashedNodesThisEpoch[j]);
             }
@@ -254,23 +250,11 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         withdrawableAmount = rewardAcc - withdrawnAlready;
     }
 
-    function createEpochCheckpoint(address user)
-        public
-        returns (uint256)
-    {
-        (
-            uint256 withdrawableAmount,
-            uint256 rewardAcc,
-            uint256 userStakeAcc,
-            uint256 totalStakeAcc
-        ) = withdrawableReward(user);
+    function createEpochCheckpoint(address user) public returns (uint256) {
+        (uint256 withdrawableAmount, uint256 rewardAcc, uint256 userStakeAcc, uint256 totalStakeAcc) =
+            withdrawableReward(user);
 
-        epochCheckpointByUser[user] = EpochCheckpoint(
-            currentEpoch(),
-            rewardAcc,
-            userStakeAcc,
-            totalStakeAcc
-        );
+        epochCheckpointByUser[user] = EpochCheckpoint(currentEpoch(), rewardAcc, userStakeAcc, totalStakeAcc);
 
         return withdrawableAmount;
     }
@@ -285,15 +269,12 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit EpochRewardChanged(currentEpoch(), prevReward, newReward);
     }
 
-    function withdrawReward()
-        external nonReentrant whenNotPaused
-        returns (uint256 withdrawableAmount)
-    {
+    function withdrawReward() external nonReentrant whenNotPaused returns (uint256 withdrawableAmount) {
         withdrawableAmount = createEpochCheckpoint(msg.sender);
 
         require(withdrawableAmount > 0, NoWithdrawableRewards());
 
-        (,uint256 prev) = rewardWithdrawalsByUser.tryGet(msg.sender);
+        (, uint256 prev) = rewardWithdrawalsByUser.tryGet(msg.sender);
         rewardWithdrawalsByUser.set(msg.sender, prev + withdrawableAmount);
 
         idosToken.safeTransfer(msg.sender, withdrawableAmount);
@@ -301,62 +282,59 @@ contract IDOSNodeStaking is ReentrancyGuard, Pausable, Ownable {
         emit RewardWithdraw(msg.sender, withdrawableAmount);
     }
 
-    function getNodeStake(address node)
-        public view
-        returns (uint256 nodeStake)
-    {
+    function getNodeStake(address node) public view returns (uint256 nodeStake) {
         (, nodeStake) = stakeByNode.tryGet(node);
     }
 
-    function getUserStake(address user)
-        public view
-        returns (uint256 activeStake, uint256 slashedStake)
-    {
+    function getUserStake(address user) public view returns (uint256 activeStake, uint256 slashedStake) {
         (, uint256 totalStake) = stakeByUser.tryGet(user);
 
-        for (uint i; i < slashedNodes.length(); i++)
+        for (uint256 i; i < slashedNodes.length(); i++) {
             slashedStake += stakeByNodeByUser[user][slashedNodes.at(i)];
+        }
 
         activeStake = totalStake - slashedStake;
     }
 
-    function getNodeStakes()
-        public view
-        returns (NodeStake[] memory unslashedNodeStakes)
-    {
+    function getNodeStakes() public view returns (NodeStake[] memory unslashedNodeStakes) {
         unslashedNodeStakes = new NodeStake[](stakeByNode.length() - slashedNodes.length());
 
-        uint returnIndex;
-        for (uint j; j < stakeByNode.length() && returnIndex < unslashedNodeStakes.length; j++) {
+        uint256 returnIndex;
+        for (uint256 j; j < stakeByNode.length() && returnIndex < unslashedNodeStakes.length; j++) {
             (address node, uint256 stake_) = stakeByNode.at(j);
             if (slashedNodes.contains(node)) continue;
             unslashedNodeStakes[returnIndex++] = NodeStake(node, stake_);
         }
     }
 
-    function getSlashedNodeStakes()
-        public view
-        returns (NodeStake[] memory nodeStakes)
-    {
+    function getSlashedNodeStakes() public view returns (NodeStake[] memory nodeStakes) {
         nodeStakes = new NodeStake[](slashedNodes.length());
 
-        for (uint i; i < slashedNodes.length(); i++)
+        for (uint256 i; i < slashedNodes.length(); i++) {
             nodeStakes[i] = NodeStake(slashedNodes.at(i), stakeByNode.get(slashedNodes.at(i)));
+        }
     }
 
-    function currentEpoch()
-        public view
-        returns (uint48 epoch)
-    {
+    function currentEpoch() public view returns (uint48 epoch) {
         require(block.timestamp >= startTime, NotStarted());
 
         epoch = uint48((uint48(block.timestamp) - startTime) / EPOCH_LENGTH);
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // Prevent accidental ETH transfers
-    receive() external payable { revert(); }
-    fallback() external payable { revert(); }
+    receive() external payable {
+        revert();
+    }
+
+    fallback() external payable {
+        revert();
+    }
 }

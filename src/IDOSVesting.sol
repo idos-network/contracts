@@ -6,12 +6,7 @@ import {VestingWallet} from "@openzeppelin/contracts/finance/VestingWallet.sol";
 import {VestingWalletCliff} from "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
 contract IDOSVesting is VestingWallet, VestingWalletCliff {
-    constructor(
-        address beneficiary,
-        uint64 startTimestamp,
-        uint64 durationSeconds,
-        uint64 cliffSeconds
-    )
+    constructor(address beneficiary, uint64 startTimestamp, uint64 durationSeconds, uint64 cliffSeconds)
         payable
         VestingWallet(beneficiary, startTimestamp, durationSeconds)
         VestingWalletCliff(cliffSeconds)
@@ -25,11 +20,10 @@ contract IDOSVesting is VestingWallet, VestingWalletCliff {
      * effect from calling the inherited implementation (i.e. `super._vestingSchedule`). Carefully consider
      * this caveat if the overridden implementation of this function has any (e.g. writing to memory or reverting).
      */
-    function _vestingSchedule(
-        uint256 totalAllocation,
-        uint64 timestamp
-    )
-        internal view override(VestingWallet, VestingWalletCliff)
+    function _vestingSchedule(uint256 totalAllocation, uint64 timestamp)
+        internal
+        view
+        override(VestingWallet, VestingWalletCliff)
         returns (uint256)
     {
         return timestamp < cliff() ? 0 : super._vestingSchedule(totalAllocation, timestamp);

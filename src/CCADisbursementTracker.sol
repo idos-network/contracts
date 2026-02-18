@@ -49,18 +49,26 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract CCADisbursementTracker is ERC20 {
     /// @notice Address of the CCA contract; only this address can hold tokens.
-    address immutable _ccaContract;
+    address immutable _CCA_CONTRACT;
     /// @notice Address authorized to record disbursements after the sale is completed.
-    address immutable _disburser;
+    address immutable _DISBURSER;
     /// @notice Total supply minted at deployment; must match the CCA's totalSupply requirement.
-    uint256 immutable _initialSupply;
+    uint256 immutable _INITIAL_SUPPLY;
 
     /// @notice Returns the CCA contract address.
-    function ccaContract() public view returns (address) { return _ccaContract; }
+    function ccaContract() public view returns (address) {
+        return _CCA_CONTRACT;
+    }
+
     /// @notice Returns the disburser address.
-    function disburser() public view returns (address) { return _disburser; }
+    function disburser() public view returns (address) {
+        return _DISBURSER;
+    }
+
     /// @notice Returns the initial supply minted at deployment.
-    function initialSupply() public view returns (uint256) { return _initialSupply; }
+    function initialSupply() public view returns (uint256) {
+        return _INITIAL_SUPPLY;
+    }
 
     /// @dev Set to true after the initial mint in the constructor; prevents further minting.
     bool private _initialMintDone;
@@ -72,20 +80,24 @@ contract CCADisbursementTracker is ERC20 {
     /// @notice Constructs the CCADisbursementTracker and mints the initial supply to the CCA contract.
     /// @param name ERC20 token name.
     /// @param symbol ERC20 token symbol.
-    /// @param initialSupply Total supply to mint; must match the CCA's totalSupply requirement.
-    /// @param ccaContract Address of the CCA contract that will hold and sell the tokens.
-    /// @param disburser Address authorized to record disbursements after the sale completes.
-    constructor(string memory name, string memory symbol, uint256 initialSupply, address ccaContract, address disburser)
-        ERC20(name, symbol)
-    {
-        if (ccaContract == address(0)) revert ZeroAddressCCAContract();
-        if (disburser == address(0)) revert ZeroAddressDisburser();
-        if (initialSupply == 0) revert NoInitialSupply();
+    /// @param initialSupply_ Total supply to mint; must match the CCA's totalSupply requirement.
+    /// @param ccaContract_ Address of the CCA contract that will hold and sell the tokens.
+    /// @param disburser_ Address authorized to record disbursements after the sale completes.
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 initialSupply_,
+        address ccaContract_,
+        address disburser_
+    ) ERC20(name, symbol) {
+        if (ccaContract_ == address(0)) revert ZeroAddressCCAContract();
+        if (disburser_ == address(0)) revert ZeroAddressDisburser();
+        if (initialSupply_ == 0) revert NoInitialSupply();
 
-        _ccaContract = ccaContract;
-        _disburser = disburser;
-        _initialSupply = initialSupply;
-        super._mint(ccaContract, initialSupply);
+        _CCA_CONTRACT = ccaContract_;
+        _DISBURSER = disburser_;
+        _INITIAL_SUPPLY = initialSupply_;
+        super._mint(ccaContract_, initialSupply_);
         _initialMintDone = true;
     }
 
@@ -98,12 +110,12 @@ contract CCADisbursementTracker is ERC20 {
     ///      - Initial mint to the CCA contract
     ///      - Burns when the CCA transfers to a holder (sale), which records missing disbursements
     function _update(address from, address to, uint256 value) internal virtual override {
-        if (from == address(0) && to == _ccaContract && !_initialMintDone) return super._update(from, to, value); // mint
+        if (from == address(0) && to == _CCA_CONTRACT && !_initialMintDone) return super._update(from, to, value); // mint
         if (from == address(0) && _initialMintDone) revert InitialMintAlreadyDone();
 
-        if (from == _ccaContract && to == _ccaContract) revert CCASelfTransferNotAllowed();
-        if (from == _ccaContract && to == address(0)) revert SimpleBurnsNotAllowed();
-        if (from == _ccaContract) {
+        if (from == _CCA_CONTRACT && to == _CCA_CONTRACT) revert CCASelfTransferNotAllowed();
+        if (from == _CCA_CONTRACT && to == address(0)) revert SimpleBurnsNotAllowed();
+        if (from == _CCA_CONTRACT) {
             super._update(from, address(0), value); // burn sold tokens
             _recordMissingDisbursement(to, value); // register missing disbursement
             return;
@@ -122,10 +134,14 @@ contract CCADisbursementTracker is ERC20 {
     uint256 private _totalMissingDisbursements;
     /// @dev Per-account amount of tokens sold that have not yet had disbursements recorded.
     mapping(address account => uint256 value) private _missingDisbursements;
+
     /// @notice A recorded disbursement with its amount and transaction reference.
     /// @param value Amount disbursed
     /// @param txHash Transaction hash where the on-chain disbursement occurred
-    struct Disbursement { uint256 value; bytes32 txHash; }
+    struct Disbursement {
+        uint256 value;
+        bytes32 txHash;
+    }
     /// @dev Per-account list of recorded disbursements for verification.
     mapping(address account => Disbursement[]) private _disbursements;
 
@@ -179,7 +195,11 @@ contract CCADisbursementTracker is ERC20 {
     /// @param offset Starting index (inclusive)
     /// @param count Number of items to return
     /// @return Disbursements in the requested range. Returns fewer than `count` if the range extends past the end.
-    function disbursementsToRange(address account, uint256 offset, uint256 count) external view returns (Disbursement[] memory) {
+    function disbursementsToRange(address account, uint256 offset, uint256 count)
+        external
+        view
+        returns (Disbursement[] memory)
+    {
         Disbursement[] storage arr = _disbursements[account];
         uint256 len = arr.length;
         if (offset >= len) return new Disbursement[](0);
@@ -189,9 +209,11 @@ contract CCADisbursementTracker is ERC20 {
         uint256 resultLen = end - offset;
 
         Disbursement[] memory result = new Disbursement[](resultLen);
-        for (uint256 i; i < resultLen; ) {
+        for (uint256 i; i < resultLen;) {
             result[i] = arr[offset + i];
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
         return result;
     }
@@ -201,17 +223,15 @@ contract CCADisbursementTracker is ERC20 {
     /// @param recipients Addresses to record disbursements for
     /// @param values Amounts disbursed to each recipient
     /// @param txHashes Transaction hashes where the on-chain disbursements occurred
-    function recordDisbursements(
-        address[] calldata recipients,
-        uint256[] calldata values,
-        bytes32[] calldata txHashes
-    ) external {
+    function recordDisbursements(address[] calldata recipients, uint256[] calldata values, bytes32[] calldata txHashes)
+        external
+    {
         if (!saleCompleted()) revert SaleNotCompleted();
-        if (msg.sender != _disburser) revert OnlyDisburserCanRecordDisbursements();
+        if (msg.sender != _DISBURSER) revert OnlyDisburserCanRecordDisbursements();
         uint256 len = recipients.length;
         if (len != values.length || len != txHashes.length) revert ArrayLengthMismatch();
 
-        for (uint256 i; i < len; ) {
+        for (uint256 i; i < len;) {
             address to = recipients[i];
             uint256 value = values[i];
             if (to == address(0)) revert NoZeroAddressRecipientAllowed();
@@ -223,16 +243,23 @@ contract CCADisbursementTracker is ERC20 {
                 _missingDisbursements[to] -= value;
             }
             _totalMissingDisbursements -= value;
-            _disbursements[to].push(Disbursement(value, txHashes[i]));
+            _disbursements[to].push(Disbursement({value: value, txHash: txHashes[i]}));
 
             emit DisbursementCompleted(to, value, txHashes[i]);
 
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 
     /// @dev Reverts; this contract does not accept ETH.
-    receive()  external payable { revert(); }
+    receive() external payable {
+        revert();
+    }
+
     /// @dev Reverts; this contract does not accept ETH.
-    fallback() external payable { revert(); }
+    fallback() external payable {
+        revert();
+    }
 }

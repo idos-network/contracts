@@ -1,0 +1,28 @@
+[profile.default]
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+show_progress = true
+gas_reports = ["*"]
+fs_permissions = [
+    { access = "read-write", path = "./deployments.toml" }
+]
+libs = ["dependencies"]
+
+[lint]
+ignore = [
+    # Didn't touch these files to avoid drifting away from the audited version.
+    "src/IDOSNodeStaking.sol",
+    "src/IDOSToken.sol",
+    "src/IDOSVesting.sol",
+    "test/IDOSNodeStaking.t.sol",
+    "test/IDOSToken.t.sol",
+    "test/IDOSVesting.t.sol",
+]
+
+[rpc_endpoints]
+arbitrum_one = "${ARBITRUM_ONE_RPC_URL}"
+arbitrum_one_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+
+[dependencies]
+"@openzeppelin-contracts" = "5.5.0"
