@@ -1,2 +1,6 @@
 @openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.5.0/
 forge-std/=lib/forge-std/src/
+continuous-clearing-auction/=lib/continuous-clearing-auction/src/
+solady/=lib/continuous-clearing-auction/lib/solady/src/
+blocknumberish/=lib/continuous-clearing-auction/lib/blocknumberish/
+permit2/=lib/continuous-clearing-auction/lib/permit2/
