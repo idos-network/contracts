@@ -124,10 +124,17 @@ contract CCADisbursementTracker is ERC20 {
         revert TokenIsUntransferable();
     }
 
-    /// @notice Returns true when the sale is complete (total supply is zero).
+    /// @notice Maximum residual dust (in wei) tolerated when checking sale completion.
+    /// @dev The CCA clearing math can leave a small rounding residual in its token balance that no
+    ///      function can extract. This threshold allows saleCompleted() to return true despite that dust.
+    uint256 public constant DUST_THRESHOLD = 1e6;
+
+    /// @notice Returns true when the sale is complete (total supply at or below dust threshold).
     /// @dev Expects sweepUnsoldTokens to have been called and all bid tokens claimed via claimTokens/claimTokensBatch.
+    ///      Uses a dust threshold instead of strict zero check because the CCA's clearing math can leave
+    ///      a small wei-level residual in its balance that is impossible to extract.
     function saleCompleted() public view returns (bool) {
-        return totalSupply() == 0;
+        return totalSupply() <= DUST_THRESHOLD;
     }
 
     /// @dev Sum of all unrecorded disbursements across all accounts.
