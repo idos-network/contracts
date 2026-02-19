@@ -67,7 +67,8 @@ contract CCADisbursementTrackerInvariantTest is Test {
         holder2 = makeAddr("holder2");
         holder3 = makeAddr("holder3");
 
-        tracker = new CCADisbursementTracker("Tracker", "TRK", SUPPLY, cca, disburser);
+        tracker = new CCADisbursementTracker("Tracker", "TRK", SUPPLY, disburser);
+        tracker.initialize(cca);
 
         vm.startPrank(cca);
         assertTrue(tracker.transfer(holder1, SUPPLY * 40 / 100));

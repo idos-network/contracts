@@ -52,16 +52,19 @@ uint256 constant MAX_ALLOWABLE_DUST_WEI = 1;
  */
 
 contract CCADisbursementTracker is ERC20 {
-    /// @notice Address of the CCA contract; only this address can hold tokens.
-    address immutable _CCA_CONTRACT;
+    /// @notice Address of the deployer; only this address can call initialize.
+    address immutable _DEPLOYER;
     /// @notice Address authorized to record disbursements after the sale is fully claimed.
     address immutable _DISBURSER;
-    /// @notice Total supply minted at deployment; must match the CCA's totalSupply requirement.
+    /// @notice Total supply minted at initialization; must match the CCA's totalSupply requirement.
     uint256 immutable _INITIAL_SUPPLY;
+
+    /// @notice Address of the CCA contract; set once via initialize, only this address can hold tokens.
+    address private _ccaContract;
 
     /// @notice Returns the CCA contract address.
     function ccaContract() public view returns (address) {
-        return _CCA_CONTRACT;
+        return _ccaContract;
     }
 
     /// @notice Returns the disburser address.
@@ -69,57 +72,70 @@ contract CCADisbursementTracker is ERC20 {
         return _DISBURSER;
     }
 
-    /// @notice Returns the initial supply minted at deployment.
+    /// @notice Returns the initial supply minted at initialization.
     function initialSupply() public view returns (uint256) {
         return _INITIAL_SUPPLY;
     }
 
-    /// @dev Set to true after the initial mint in the constructor; prevents further minting.
-    bool private _initialMintDone;
-
     error ZeroAddressCCAContract();
     error ZeroAddressDisburser();
     error NoInitialSupply();
+    error AlreadyInitialized();
+    error NotInitialized();
+    error OnlyDeployerCanInitialize();
 
-    /// @notice Constructs the CCADisbursementTracker and mints the initial supply to the CCA contract.
+    /// @notice Constructs the CCADisbursementTracker. Call initialize to bind the CCA and mint the supply.
     /// @param name ERC20 token name.
     /// @param symbol ERC20 token symbol.
     /// @param initialSupply_ Total supply to mint; must match the CCA's totalSupply requirement.
-    /// @param ccaContract_ Address of the CCA contract that will hold and sell the tokens.
     /// @param disburser_ Address authorized to record disbursements after the sale is fully claimed.
     constructor(
         string memory name,
         string memory symbol,
         uint256 initialSupply_,
-        address ccaContract_,
         address disburser_
     ) ERC20(name, symbol) {
-        if (ccaContract_ == address(0)) revert ZeroAddressCCAContract();
         if (disburser_ == address(0)) revert ZeroAddressDisburser();
         if (initialSupply_ == 0) revert NoInitialSupply();
 
-        _CCA_CONTRACT = ccaContract_;
+        _DEPLOYER = msg.sender;
         _DISBURSER = disburser_;
         _INITIAL_SUPPLY = initialSupply_;
-        super._mint(ccaContract_, initialSupply_);
-        _initialMintDone = true;
+    }
+
+    /// @notice Binds the CCA contract and mints the initial supply to it. Can only be called once, by the deployer.
+    /// @param ccaContract_ Address of the CCA contract that will hold and sell the tokens.
+    function initialize(address ccaContract_) external {
+        if (msg.sender != _DEPLOYER) revert OnlyDeployerCanInitialize();
+        if (_ccaContract != address(0)) revert AlreadyInitialized();
+        if (ccaContract_ == address(0)) revert ZeroAddressCCAContract();
+
+        _ccaContract = ccaContract_;
+        super._mint(ccaContract_, _INITIAL_SUPPLY);
     }
 
     error CCASelfTransferNotAllowed();
-    error InitialMintAlreadyDone();
+    error MintingAlreadyDone();
+    error MintingToInvalidAddress();
     error SimpleBurnsNotAllowed();
     error TokenIsUntransferable();
 
     /// @dev Overrides ERC20._update to make tokens effectively untransferable except for:
-    ///      - Initial mint to the CCA contract
+    ///      - Mint to the CCA contract during initialize (exactly once, when totalSupply is still 0)
     ///      - Burns when the CCA transfers to a holder (sale), which records missing disbursements
     function _update(address from, address to, uint256 value) internal virtual override {
-        if (from == address(0) && to == _CCA_CONTRACT && !_initialMintDone) return super._update(from, to, value); // mint
-        if (from == address(0) && _initialMintDone) revert InitialMintAlreadyDone();
+        address cca = _ccaContract;
 
-        if (from == _CCA_CONTRACT && to == _CCA_CONTRACT) revert CCASelfTransferNotAllowed();
-        if (from == _CCA_CONTRACT && to == address(0)) revert SimpleBurnsNotAllowed();
-        if (from == _CCA_CONTRACT) {
+        if (from == address(0)) {
+            if (cca == address(0)) revert NotInitialized();
+            if (to != cca) revert MintingToInvalidAddress();
+            if (totalSupply() != 0) revert MintingAlreadyDone();
+            return super._update(from, to, value);
+        }
+
+        if (from == cca && to == cca) revert CCASelfTransferNotAllowed();
+        if (from == cca && to == address(0)) revert SimpleBurnsNotAllowed();
+        if (from == cca) {
             super._update(from, address(0), value); // burn sold tokens
             _recordMissingDisbursement(to, value); // register missing disbursement
             return;
