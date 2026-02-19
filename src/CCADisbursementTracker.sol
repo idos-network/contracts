@@ -5,6 +5,10 @@ pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+// @dev As per CCA's own tests, the CCA can leave up to 1e18 wei of dust in the
+//      contract after sweep+claim.
+uint256 constant MAX_ALLOWABLE_DUST_WEI = 1;
+
 /**
  * @title CCADisbursementTracker
  * @author Paulo Koch <pkoch@idos.network>
@@ -125,15 +129,16 @@ contract CCADisbursementTracker is ERC20 {
     }
 
     /// @notice Returns true when the sale is fully claimed (total supply is zero).
-    /// @dev Expects sweepUnsoldTokens to have been called and all bid tokens claimed via claimTokens/claimTokensBatch.
+    /// @dev Expects sweepUnsoldTokens to have been called and all bid tokens claimed via claimTokens/claimTokensBatch,
+    ///      with at most MAX_ALLOWABLE_DUST_WEI tokens left in the contract after the sweep.
     function saleFullyClaimed() public view returns (bool) {
-        return totalSupply() == 0;
+        return totalSupply() <= MAX_ALLOWABLE_DUST_WEI;
     }
 
     /// @notice Returns true when the sale is fully disbursed (total supply is zero and all missing disbursements recorded).
     /// @dev Expects sweepUnsoldTokens to have been called, all bid tokens claimed, and all disbursements recorded via recordDisbursements.
     function saleFullyDisbursed() public view returns (bool) {
-        return totalSupply() == 0 && _totalMissingDisbursements == 0;
+        return saleFullyClaimed() && _totalMissingDisbursements == 0;
     }
 
     /// @dev Sum of all unrecorded disbursements across all accounts.
