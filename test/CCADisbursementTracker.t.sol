@@ -39,7 +39,8 @@ contract CCADisbursementTrackerUnitTest is Test {
         holder2 = makeAddr("holder2");
         nobody = makeAddr("nobody");
 
-        tracker = new CCADisbursementTracker("Tracker", "TRK", SUPPLY, cca, disburser_);
+        tracker = new CCADisbursementTracker("Tracker", "TRK", SUPPLY, disburser_);
+        tracker.initialize(cca);
     }
 
     // --- Constructor ---
@@ -56,17 +57,34 @@ contract CCADisbursementTrackerUnitTest is Test {
 
     function test_Constructor_RevertsOnZeroSupply() public {
         vm.expectRevert(CCADisbursementTracker.NoInitialSupply.selector);
-        new CCADisbursementTracker("T", "T", 0, cca, disburser_);
-    }
-
-    function test_Constructor_RevertsOnZeroCCA() public {
-        vm.expectRevert(CCADisbursementTracker.ZeroAddressCCAContract.selector);
-        new CCADisbursementTracker("T", "T", SUPPLY, address(0), disburser_);
+        new CCADisbursementTracker("T", "T", 0, disburser_);
     }
 
     function test_Constructor_RevertsOnZeroDisburser() public {
         vm.expectRevert(CCADisbursementTracker.ZeroAddressDisburser.selector);
-        new CCADisbursementTracker("T", "T", SUPPLY, cca, address(0));
+        new CCADisbursementTracker("T", "T", SUPPLY, address(0));
+    }
+
+    // --- Initialize ---
+
+    function test_Initialize_RevertsOnZeroCCA() public {
+        CCADisbursementTracker t = new CCADisbursementTracker("T", "T", SUPPLY, disburser_);
+        vm.expectRevert(CCADisbursementTracker.ZeroAddressCCAContract.selector);
+        t.initialize(address(0));
+    }
+
+    function test_Initialize_RevertsIfCalledTwice() public {
+        CCADisbursementTracker t = new CCADisbursementTracker("T", "T", SUPPLY, disburser_);
+        t.initialize(cca);
+        vm.expectRevert(CCADisbursementTracker.AlreadyInitialized.selector);
+        t.initialize(cca);
+    }
+
+    function test_Initialize_RevertsIfNotDeployer() public {
+        CCADisbursementTracker t = new CCADisbursementTracker("T", "T", SUPPLY, disburser_);
+        vm.prank(nobody);
+        vm.expectRevert(CCADisbursementTracker.OnlyDeployerCanInitialize.selector);
+        t.initialize(cca);
     }
 
     // --- Transfer Restrictions ---
@@ -456,10 +474,8 @@ contract CCADisbursementTrackerIntegrationTest is Test {
 
         bytes memory stepsData = _buildStepsData(auctionLength);
 
-        address predictedAuction = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-
         tracker = new CCADisbursementTracker(
-            "CCA Tracker", "CCAT", TOKEN_SUPPLY, predictedAuction, disburser_
+            "CCA Tracker", "CCAT", TOKEN_SUPPLY, disburser_
         );
 
         auction = _deployAuction(
@@ -467,8 +483,8 @@ contract CCADisbursementTrackerIntegrationTest is Test {
             startBlock, endBlock, claimBlock,
             REQUIRED_RAISE, stepsData
         );
-        assertEq(address(auction), predictedAuction);
 
+        tracker.initialize(address(auction));
         auction.onTokensReceived();
 
         vm.deal(bidder1, 100_000 ether);
