@@ -4,7 +4,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {CCADisbursementTracker} from "../src/CCADisbursementTracker.sol";
+import {CCADisbursementTracker, MAX_ALLOWABLE_DUST_WEI} from "../src/CCADisbursementTracker.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {ContinuousClearingAuction} from "continuous-clearing-auction/ContinuousClearingAuction.sol";
@@ -662,22 +662,21 @@ contract CCADisbursementTrackerIntegrationTest is Test {
         auction.claimTokens(bid2Id);
         auction.sweepUnsoldTokens();
 
-        assertFalse(tracker.saleFullyClaimed()); // !!!: This should be true, but we're not handling dust well.
-
         // The CCA's Q96 fixed-point arithmetic intentionally rounds up when
         // converting currency to tokens (see ContinuousClearingAuction.sol L270-272),
         // which can leave a small amount of token dust after sweep+claim.
         // The CCA's own tests tolerate up to MAX_ALLOWABLE_DUST_WEI = 1e18
         // (see AuctionBaseTest.sol L53, SweepUnsoldTokens.t.sol L144-148).
-        assertEq(tracker.totalSupply(), 1);
-        uint256 dust = tracker.totalSupply();
-        assertLe(dust, 1, "at most 1 wei of rounding dust");
+        assertLe(tracker.totalSupply(), MAX_ALLOWABLE_DUST_WEI);
+        assertTrue(tracker.saleFullyClaimed());
 
-        assertEq(tracker.missingDisbursementTo(bidder1), 0, "outbid bidder should have no missing disbursements");
-        assertEq(tracker.missingDisbursementTo(bidder2), TOKEN_SUPPLY - dust);
+        uint256 bid2Tokens = TOKEN_SUPPLY - MAX_ALLOWABLE_DUST_WEI;
+        assertEq(tracker.missingDisbursementTo(bidder1), 0);
+        assertEq(tracker.missingDisbursementTo(bidder2), bid2Tokens);
         assertEq(tracker.missingDisbursementTo(tokensRecipient), 0);
 
-        assertFalse(tracker.saleFullyDisbursed()); // !!!: This should be true, but we're not handling dust well.
+        _recordSingle(bidder2, bid2Tokens, bytes32(uint256(0xff)));
+        assertTrue(tracker.saleFullyDisbursed());
     }
 
     function _recordSingle(address to, uint256 value, bytes32 txHash) internal {
