@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 // cSpell:words overdisbursement
 
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+// @dev As per CCA's own tests, the CCA can leave up to 1e18 wei of dust in the
+//      contract after sweep+claim.
+uint256 constant MAX_ALLOWABLE_DUST_WEI = 1;
 
 /**
  * @title CCADisbursementTracker
@@ -15,7 +19,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  * some phases might follow a vesting schedule, etc.). For those cases, this contract is meant to be a stand-in for
  * the token being sold by the CCA (the "original token"). It will record the amounts that the CCA contract wanted
  * to send to each holder, but no movement of tokens will actually take place -- neither of this one or of the original.
- * A disburser is meant to enact them independently of this contract after the sale is completed, and use this contract
+ * A disburser is meant to enact them independently of this contract after the sale is fully claimed, and use this contract
  * to record how those disbursements have been made.
  *
  * Note well: in case that there's any logic around discount, bonus, or anything that affects the amount of tokens,
@@ -33,9 +37,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  * - This contract keeps track that that amount should be later on disbursed to the holder. These are called "missing
  * disbursements".
  *
- * This contract only allows disbursements to be recorded after the sale is completed. It considers the sale completed
- * when the total supply of this token is 0. The is achieved by calling `sweepUnsoldTokens` and by ensuring that all
- * `claimTokens` or `claimTokensBatch` calls have been made.
+ * This contract only allows disbursements to be recorded after the sale is fully claimed. It considers the sale fully
+ * claimed when the total supply of this token is 0. This is achieved by calling `sweepUnsoldTokens` and by ensuring
+ * that all `claimTokens` or `claimTokensBatch` calls have been made.
  *
  * Note well: `claimTokensBatch` makes things harder to track 1:1 with this contract, since that can make a single
  * transfer that contains bids from different phases of the sale.
@@ -50,7 +54,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract CCADisbursementTracker is ERC20 {
     /// @notice Address of the CCA contract; only this address can hold tokens.
     address immutable _CCA_CONTRACT;
-    /// @notice Address authorized to record disbursements after the sale is completed.
+    /// @notice Address authorized to record disbursements after the sale is fully claimed.
     address immutable _DISBURSER;
     /// @notice Total supply minted at deployment; must match the CCA's totalSupply requirement.
     uint256 immutable _INITIAL_SUPPLY;
@@ -82,7 +86,7 @@ contract CCADisbursementTracker is ERC20 {
     /// @param symbol ERC20 token symbol.
     /// @param initialSupply_ Total supply to mint; must match the CCA's totalSupply requirement.
     /// @param ccaContract_ Address of the CCA contract that will hold and sell the tokens.
-    /// @param disburser_ Address authorized to record disbursements after the sale completes.
+    /// @param disburser_ Address authorized to record disbursements after the sale is fully claimed.
     constructor(
         string memory name,
         string memory symbol,
@@ -124,10 +128,17 @@ contract CCADisbursementTracker is ERC20 {
         revert TokenIsUntransferable();
     }
 
-    /// @notice Returns true when the sale is complete (total supply is zero).
-    /// @dev Expects sweepUnsoldTokens to have been called and all bid tokens claimed via claimTokens/claimTokensBatch.
-    function saleCompleted() public view returns (bool) {
-        return totalSupply() == 0;
+    /// @notice Returns true when the sale is fully claimed (total supply is zero).
+    /// @dev Expects sweepUnsoldTokens to have been called and all bid tokens claimed via claimTokens/claimTokensBatch,
+    ///      with at most MAX_ALLOWABLE_DUST_WEI tokens left in the contract after the sweep.
+    function saleFullyClaimed() public view returns (bool) {
+        return totalSupply() <= MAX_ALLOWABLE_DUST_WEI;
+    }
+
+    /// @notice Returns true when the sale is fully disbursed (total supply is zero and all missing disbursements recorded).
+    /// @dev Expects sweepUnsoldTokens to have been called, all bid tokens claimed, and all disbursements recorded via recordDisbursements.
+    function saleFullyDisbursed() public view returns (bool) {
+        return saleFullyClaimed() && _totalMissingDisbursements == 0;
     }
 
     /// @dev Sum of all unrecorded disbursements across all accounts.
@@ -149,7 +160,7 @@ contract CCADisbursementTracker is ERC20 {
     error NoZeroAddressRecipientAllowed();
     error OnlyDisburserCanRecordDisbursements();
     error OverdisbursementDetected();
-    error SaleNotCompleted();
+    error SaleNotFullyClaimed();
     error ArrayLengthMismatch();
 
     event MissingDisbursementRecorded(address indexed to, uint256 value);
@@ -219,14 +230,14 @@ contract CCADisbursementTracker is ERC20 {
     }
 
     /// @notice Records disbursements made off-chain, reducing the missing disbursement balances.
-    /// @dev Only callable by the disburser after the sale is completed. Reverts on overdisbursement or zero amounts.
+    /// @dev Only callable by the disburser after the sale is fully claimed. Reverts on overdisbursement or zero amounts.
     /// @param recipients Addresses to record disbursements for
     /// @param values Amounts disbursed to each recipient
     /// @param txHashes Transaction hashes where the on-chain disbursements occurred
     function recordDisbursements(address[] calldata recipients, uint256[] calldata values, bytes32[] calldata txHashes)
         external
     {
-        if (!saleCompleted()) revert SaleNotCompleted();
+        if (!saleFullyClaimed()) revert SaleNotFullyClaimed();
         if (msg.sender != _DISBURSER) revert OnlyDisburserCanRecordDisbursements();
         uint256 len = recipients.length;
         if (len != values.length || len != txHashes.length) revert ArrayLengthMismatch();
