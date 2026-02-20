@@ -183,15 +183,21 @@ contract CCADisbursementTrackerUnitTest is Test {
     }
 
     function _recordSingle(address to, uint256 value, bytes32 txHash) internal {
+        _recordSingle(to, value, txHash, 0);
+    }
+
+    function _recordSingle(address to, uint256 value, bytes32 txHash, uint256 txIndex) internal {
         address[] memory recipients = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes32[] memory txHashes = new bytes32[](1);
+        uint256[] memory txIndices = new uint256[](1);
         recipients[0] = to;
         values[0] = value;
         txHashes[0] = txHash;
+        txIndices[0] = txIndex;
 
         vm.prank(disburser_);
-        tracker.recordDisbursements(recipients, values, txHashes);
+        tracker.recordDisbursements(recipients, values, txHashes, txIndices);
     }
 
     function test_RecordDisbursements_RevertsIfSaleNotFullyClaimed() public {
@@ -206,7 +212,7 @@ contract CCADisbursementTrackerUnitTest is Test {
 
         vm.prank(nobody);
         vm.expectRevert(CCADisbursementTracker.OnlyDisburserCanRecordDisbursements.selector);
-        tracker.recordDisbursements(new address[](0), new uint256[](0), new bytes32[](0));
+        tracker.recordDisbursements(new address[](0), new uint256[](0), new bytes32[](0), new uint256[](0));
     }
 
     function test_RecordDisbursements_RevertsOnArrayLengthMismatch() public {
@@ -215,10 +221,11 @@ contract CCADisbursementTrackerUnitTest is Test {
         address[] memory r = new address[](2);
         uint256[] memory v = new uint256[](1);
         bytes32[] memory t = new bytes32[](2);
+        uint256[] memory idx = new uint256[](2);
 
         vm.prank(disburser_);
         vm.expectRevert(CCADisbursementTracker.ArrayLengthMismatch.selector);
-        tracker.recordDisbursements(r, v, t);
+        tracker.recordDisbursements(r, v, t, idx);
     }
 
     function test_RecordDisbursements_RevertsOnZeroAddress() public {
@@ -301,8 +308,8 @@ contract CCADisbursementTrackerUnitTest is Test {
         bytes32 txHash = bytes32(uint256(42));
 
         vm.expectEmit();
-        emit CCADisbursementTracker.DisbursementCompleted(holder1, 100, txHash);
-        _recordSingle(holder1, 100, txHash);
+        emit CCADisbursementTracker.DisbursementCompleted(holder1, 100, txHash, 7);
+        _recordSingle(holder1, 100, txHash, 7);
     }
 
     function test_RecordDisbursements_BatchMultipleRecipients() public {
@@ -312,15 +319,18 @@ contract CCADisbursementTrackerUnitTest is Test {
         address[] memory r = new address[](2);
         uint256[] memory v = new uint256[](2);
         bytes32[] memory t = new bytes32[](2);
+        uint256[] memory idx = new uint256[](2);
         r[0] = holder1;
         r[1] = holder2;
         v[0] = half;
         v[1] = half;
         t[0] = bytes32(uint256(1));
         t[1] = bytes32(uint256(2));
+        idx[0] = 0;
+        idx[1] = 1;
 
         vm.prank(disburser_);
-        tracker.recordDisbursements(r, v, t);
+        tracker.recordDisbursements(r, v, t, idx);
 
         assertEq(tracker.totalMissingDisbursements(), 0);
         assertTrue(tracker.saleFullyDisbursed());
@@ -330,15 +340,17 @@ contract CCADisbursementTrackerUnitTest is Test {
 
     function test_DisbursementsTo_ReturnsAll() public {
         _completeSale();
-        _recordSingle(holder1, 100, bytes32(uint256(1)));
-        _recordSingle(holder1, 200, bytes32(uint256(2)));
+        _recordSingle(holder1, 100, bytes32(uint256(1)), 0);
+        _recordSingle(holder1, 200, bytes32(uint256(2)), 3);
 
         CCADisbursementTracker.Disbursement[] memory d = tracker.disbursementsTo(holder1);
         assertEq(d.length, 2);
         assertEq(d[0].value, 100);
         assertEq(d[0].txHash, bytes32(uint256(1)));
+        assertEq(d[0].txIndex, 0);
         assertEq(d[1].value, 200);
         assertEq(d[1].txHash, bytes32(uint256(2)));
+        assertEq(d[1].txIndex, 3);
     }
 
     function test_DisbursementsToRange_OffsetPastEnd() public {
@@ -543,11 +555,13 @@ contract CCADisbursementTrackerIntegrationTest is Test {
         address[] memory recipients = new address[](3);
         uint256[] memory values = new uint256[](3);
         bytes32[] memory txHashes = new bytes32[](3);
+        uint256[] memory txIndices = new uint256[](3);
         (recipients[0], recipients[1], recipients[2]) = (bidder1, bidder2, tokensRecipient);
         (values[0], values[1], values[2]) = (expectedBidder1Tokens, expectedBidder2Tokens, expectedSweepTokens);
         (txHashes[0], txHashes[1], txHashes[2]) = (bytes32(uint256(0xaa)), bytes32(uint256(0xbb)), bytes32(uint256(0xcc)));
+        (txIndices[0], txIndices[1], txIndices[2]) = (0, 1, 2);
         vm.prank(disburser_);
-        tracker.recordDisbursements(recipients, values, txHashes);
+        tracker.recordDisbursements(recipients, values, txHashes, txIndices);
 
         // Confirm tracker is empty.
         assertEq(tracker.missingDisbursementTo(bidder1), 0);
@@ -700,11 +714,13 @@ contract CCADisbursementTrackerIntegrationTest is Test {
         address[] memory r = new address[](1);
         uint256[] memory v = new uint256[](1);
         bytes32[] memory t = new bytes32[](1);
+        uint256[] memory idx = new uint256[](1);
         r[0] = to;
         v[0] = value;
         t[0] = txHash;
+        idx[0] = 0;
 
         vm.prank(disburser_);
-        tracker.recordDisbursements(r, v, t);
+        tracker.recordDisbursements(r, v, t, idx);
     }
 }
