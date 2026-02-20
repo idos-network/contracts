@@ -1,20 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeDisbursement, BPS_BASE, WHALE_IMMEDIATE_BPS } from "./computeDisbursement.js";
+import { computeDisbursement } from "./computeDisbursement.js";
 
 const e18 = 10n ** 18n;
-
-function ccaWhaleSplit(ccaWhale: bigint) {
-  const immediate = (ccaWhale * WHALE_IMMEDIATE_BPS) / BPS_BASE;
-  return { immediate, vested: ccaWhale - immediate };
-}
 
 describe("computeDisbursement", () => {
   describe("whale 400 + normal 100 (the canonical example)", () => {
     const r = computeDisbursement(400n * e18, 100n * e18);
 
     it("preserves input CCA totals", () => {
-      assert.equal(r.ccaWhale, 400n * e18);
+      assert.equal(r.ccaWhaleImmediate + r.ccaWhaleVested, 400n * e18);
       assert.equal(r.ccaNormal, 100n * e18);
     });
 
@@ -28,8 +23,7 @@ describe("computeDisbursement", () => {
     });
 
     it("tracker record amounts sum to full CCA allocation", () => {
-      const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
-      const trackerTotal = r.ccaNormal + immediate + vested;
+      const trackerTotal = r.ccaNormal + r.ccaWhaleImmediate + r.ccaWhaleVested;
       assert.equal(trackerTotal, 500n * e18);
     });
 
@@ -39,9 +33,8 @@ describe("computeDisbursement", () => {
     });
 
     it("disbursable amounts exceed CCA amounts for whale portions", () => {
-      const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
-      assert.notEqual(immediate, r.disbursableWhaleImmediately);
-      assert.notEqual(vested, r.disbursableWhaleVested);
+      assert.notEqual(r.ccaWhaleImmediate, r.disbursableWhaleImmediately);
+      assert.notEqual(r.ccaWhaleVested, r.disbursableWhaleVested);
     });
   });
 
@@ -59,8 +52,7 @@ describe("computeDisbursement", () => {
     });
 
     it("CCA whale split sums to original", () => {
-      const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
-      assert.equal(immediate + vested, 1000n * e18);
+      assert.equal(r.ccaWhaleImmediate + r.ccaWhaleVested, 1000n * e18);
     });
 
     it("actual tokens are 120% of CCA amount", () => {
@@ -72,7 +64,8 @@ describe("computeDisbursement", () => {
     const r = computeDisbursement(0n, 500n * e18);
 
     it("has no whale portion", () => {
-      assert.equal(r.ccaWhale, 0n);
+      assert.equal(r.ccaWhaleImmediate, 0n);
+      assert.equal(r.ccaWhaleVested, 0n);
       assert.equal(r.disbursableWhaleImmediately, 0n);
       assert.equal(r.disbursableWhaleVested, 0n);
     });
@@ -86,7 +79,8 @@ describe("computeDisbursement", () => {
     const r = computeDisbursement(0n, 0n);
 
     it("everything is zero", () => {
-      assert.equal(r.ccaWhale, 0n);
+      assert.equal(r.ccaWhaleImmediate, 0n);
+      assert.equal(r.ccaWhaleVested, 0n);
       assert.equal(r.ccaNormal, 0n);
       assert.equal(r.disbursableWhaleImmediately, 0n);
       assert.equal(r.disbursableWhaleVested, 0n);
@@ -98,14 +92,12 @@ describe("computeDisbursement", () => {
     const r = computeDisbursement(3n, 0n);
 
     it("CCA whale split still sums to original", () => {
-      const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
-      assert.equal(immediate + vested, 3n);
+      assert.equal(r.ccaWhaleImmediate + r.ccaWhaleVested, 3n);
     });
 
     it("no tokens are lost to rounding in CCA split", () => {
-      const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
-      assert.equal(immediate, 0n);
-      assert.equal(vested, 3n);
+      assert.equal(r.ccaWhaleImmediate, 0n);
+      assert.equal(r.ccaWhaleVested, 3n);
     });
   });
 
@@ -122,18 +114,17 @@ describe("computeDisbursement", () => {
       it(`whale=${whale}, normal=${normal}`, () => {
         const r = computeDisbursement(whale, normal);
 
-        const { immediate, vested } = ccaWhaleSplit(r.ccaWhale);
         assert.equal(
-          immediate + vested, whale,
+          r.ccaWhaleImmediate + r.ccaWhaleVested, whale,
           "CCA immediate + vested must equal whale input",
         );
 
         assert.ok(
-          r.disbursableWhaleImmediately >= immediate,
+          r.disbursableWhaleImmediately >= r.ccaWhaleImmediate,
           "disbursable immediate must be >= CCA immediate",
         );
         assert.ok(
-          r.disbursableWhaleVested >= vested,
+          r.disbursableWhaleVested >= r.ccaWhaleVested,
           "disbursable vested must be >= CCA vested",
         );
 

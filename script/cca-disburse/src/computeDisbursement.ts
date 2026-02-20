@@ -3,7 +3,8 @@ export const WHALE_BONUS_BPS = 20_00n; // 20.00% bonus
 export const WHALE_IMMEDIATE_BPS = 25_00n; // 25.00% of bonus-adjusted total
 
 export interface BidderDisbursement {
-  ccaWhale: bigint;
+  ccaWhaleImmediate: bigint;
+  ccaWhaleVested: bigint;
   ccaNormal: bigint;
   disbursableWhaleImmediately: bigint;
   disbursableWhaleVested: bigint;
@@ -28,7 +29,8 @@ export function computeDisbursement(
   const bonusMultiplier = BPS_BASE + WHALE_BONUS_BPS;
 
   return {
-    ccaWhale,
+    ccaWhaleImmediate,
+    ccaWhaleVested,
     ccaNormal,
     disbursableWhaleImmediately: (ccaWhaleImmediate * bonusMultiplier) / BPS_BASE,
     disbursableWhaleVested: (ccaWhaleVested * bonusMultiplier) / BPS_BASE,
