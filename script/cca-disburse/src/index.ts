@@ -10,11 +10,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
 import { ccaAbi, disperseAbi, erc20Abi, trackerAbi } from "./abis";
-import {
-	BPS_BASE,
-	computeDisbursement,
-	WHALE_IMMEDIATE_BPS,
-} from "./computeDisbursement";
+import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -64,11 +60,6 @@ const walletClient = createWalletClient({
 function required<T>(value: T | undefined, label: string): T {
 	if (value === undefined) throw new Error(`Missing event field: ${label}`);
 	return value;
-}
-
-function ccaWhaleSplit(ccaWhale: bigint) {
-	const immediate = (ccaWhale * WHALE_IMMEDIATE_BPS) / BPS_BASE;
-	return { immediate, vested: ccaWhale - immediate };
 }
 
 function splitBy<T>(items: T[], predicate: (item: T) => boolean): [T[], T[]] {
@@ -276,9 +267,6 @@ for (const addr of bidderAddresses) {
 		sumOf(normalBids.map((b) => b.tokensFilled)),
 	);
 
-	const { immediate: ccaWhaleImmediate, vested: ccaWhaleVested } =
-		ccaWhaleSplit(r.ccaWhale);
-
 	if (r.ccaNormal > 0n) {
 		expectedEntries.push({
 			trackerRecipient: addr,
@@ -289,21 +277,21 @@ for (const addr of bidderAddresses) {
 		});
 	}
 
-	if (ccaWhaleImmediate > 0n) {
+	if (r.ccaWhaleImmediate > 0n) {
 		expectedEntries.push({
 			trackerRecipient: addr,
 			transferTo: addr,
-			ccaAmount: ccaWhaleImmediate,
+			ccaAmount: r.ccaWhaleImmediate,
 			transferAmount: r.disbursableWhaleImmediately,
 			label: "whale immediate",
 		});
 	}
 
-	if (ccaWhaleVested > 0n) {
+	if (r.ccaWhaleVested > 0n) {
 		expectedEntries.push({
 			trackerRecipient: addr,
 			transferTo: TOKENOPS_ADDRESS,
-			ccaAmount: ccaWhaleVested,
+			ccaAmount: r.ccaWhaleVested,
 			transferAmount: r.disbursableWhaleVested,
 			label: "whale vested",
 		});
