@@ -5,6 +5,7 @@ idOS
 IERC20
 reentrancy
 soldeer
+TOKENOPS
 unslashed
 unstake
 unstaked

@@ -4,6 +4,7 @@ import {
 	createPublicClient,
 	createWalletClient,
 	formatEther,
+	getContract,
 	type Hex,
 	http,
 } from "viem";
@@ -12,35 +13,28 @@ import { arbitrumSepolia } from "viem/chains";
 import { ccaAbi, disperseAbi, erc20Abi, trackerAbi } from "./abis";
 import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
-
-// ── CLI ─────────────────────────────────────────────────────────────────────
+import {
+	assertCondition,
+	ensureHex,
+	iso8601ToTimestamp,
+	required,
+	requireEnv,
+	splitBy,
+	sumOf,
+} from "./lib";
 
 const DRY_RUN = process.argv.includes("--dry-run");
-
 if (DRY_RUN)
 	console.log("*** DRY RUN — no transactions will be broadcast ***\n");
-
-// ── Config ──────────────────────────────────────────────────────────────────
-
-function requireEnv(name: string): string {
-	const value = process.env[name];
-	if (!value) throw new Error(`Missing required env var: ${name}`);
-	return value;
-}
 
 const RPC_URL = requireEnv("RPC_URL");
 const DISBURSER_PRIVATE_KEY = requireEnv("DISBURSER_PRIVATE_KEY");
 const TRACKER_ADDRESS = requireEnv("TRACKER_ADDRESS") as Address;
 const CCA_ADDRESS = requireEnv("CCA_ADDRESS") as Address;
-const TOKEN_ADDRESS = requireEnv("TOKEN_ADDRESS") as Address;
+const SOLD_TOKEN_ADDRESS = requireEnv("SOLD_TOKEN_ADDRESS") as Address;
 const DISPERSE_ADDRESS = requireEnv("DISPERSE_ADDRESS") as Address;
 const TOKENOPS_ADDRESS = requireEnv("TOKENOPS_ADDRESS") as Address;
 const NORMAL_PHASE_START = requireEnv("NORMAL_PHASE_START");
-
-const ensureHex = (value: string): Hex => {
-	if (value.startsWith("0x")) return value as Hex;
-	return `0x${value}` as Hex;
-};
 
 const disburser = privateKeyToAccount(ensureHex(DISBURSER_PRIVATE_KEY));
 
@@ -49,44 +43,32 @@ const publicClient = createPublicClient({
 	transport: http(RPC_URL),
 });
 
-const walletClient = createWalletClient({
+const disburserClient = createWalletClient({
 	chain: arbitrumSepolia,
 	transport: http(RPC_URL),
 	account: disburser,
 });
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+const ccaContract = getContract({
+	address: CCA_ADDRESS,
+	abi: ccaAbi,
+	client: publicClient,
+});
 
-function required<T>(value: T | undefined, label: string): T {
-	if (value === undefined) throw new Error(`Missing event field: ${label}`);
-	return value;
-}
+const trackerContract = getContract({
+	address: TRACKER_ADDRESS,
+	abi: trackerAbi,
+	client: disburserClient,
+});
 
-function splitBy<T>(items: T[], predicate: (item: T) => boolean): [T[], T[]] {
-	const yes: T[] = [];
-	const no: T[] = [];
-	for (const item of items) {
-		(predicate(item) ? yes : no).push(item);
-	}
-	return [yes, no];
-}
-
-function iso8601ToTimestamp(iso: string): bigint {
-	const ms = new Date(iso).getTime();
-	if (Number.isNaN(ms)) {
-		throw new Error(
-			`Invalid ISO 8601 timestamp: "${iso}". Use format like "2025-03-15T12:00:00Z".`,
-		);
-	}
-	return BigInt(Math.floor(ms / 1000));
-}
-
-function sumOf(values: bigint[]): bigint {
-	return values.reduce((a, b) => a + b, 0n);
-}
+const soldTokenContract = getContract({
+	address: SOLD_TOKEN_ADDRESS,
+	abi: erc20Abi,
+	client: disburserClient,
+});
 
 interface DisbursementEntry {
-	trackerRecipient: Address;
+	to: Address;
 	transferTo: Address;
 	ccaAmount: bigint;
 	transferAmount: bigint;
@@ -95,64 +77,45 @@ interface DisbursementEntry {
 
 // ── 1. Fetch CCA data, resolve phase boundary, compute filled bids ──────────
 
-console.log("Fetching CCA data...");
-
-const [ccaStartBlock, ccaEndBlock] = await Promise.all([
-	publicClient.readContract({
-		address: CCA_ADDRESS,
-		abi: ccaAbi,
-		functionName: "startBlock",
-	}),
-	publicClient.readContract({
-		address: CCA_ADDRESS,
-		abi: ccaAbi,
-		functionName: "endBlock",
-	}),
-]);
+const ccaStartBlock = await ccaContract.read.startBlock();
+const ccaEndBlock = await ccaContract.read.endBlock();
 const currentBlock = await publicClient.getBlockNumber();
 
-console.log(`  CCA: blocks ${ccaStartBlock}–${ccaEndBlock}`);
-console.log(`  Current block: ${currentBlock}`);
+assertCondition(
+	currentBlock >= ccaEndBlock,
+	`CCA end block is in the future. We're at block ${currentBlock} and need to wait for block ${ccaEndBlock} to be mined.`,
+);
 
-if (currentBlock < ccaEndBlock) {
-	throw new Error(
-		`CCA end block is in the future. We're at block ${currentBlock} and need to wait for block ${ccaEndBlock} to be mined.`,
-	);
-}
-
-const normalPhaseStartTimestamp = iso8601ToTimestamp(NORMAL_PHASE_START);
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
-	normalPhaseStartTimestamp,
-	BigInt(ccaStartBlock),
-	BigInt(ccaEndBlock),
-	async (blockNumber: bigint) =>
+	iso8601ToTimestamp(NORMAL_PHASE_START),
+	ccaStartBlock,
+	ccaEndBlock,
+	async (blockNumber) =>
 		(await publicClient.getBlock({ blockNumber })).timestamp,
 );
 
-console.log(`  Phase boundary block: ${phaseBoundaryBlock}`);
-
 const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
-	publicClient.getContractEvents({
-		address: CCA_ADDRESS,
-		abi: ccaAbi,
-		eventName: "BidSubmitted",
-		fromBlock: BigInt(ccaStartBlock),
-		toBlock: BigInt(ccaEndBlock),
-	}),
-	publicClient.getContractEvents({
-		address: CCA_ADDRESS,
-		abi: ccaAbi,
-		eventName: "TokensClaimed",
-		fromBlock: BigInt(ccaStartBlock),
-		toBlock: currentBlock,
-	}),
-	publicClient.getContractEvents({
-		address: CCA_ADDRESS,
-		abi: ccaAbi,
-		eventName: "TokensSwept",
-		fromBlock: BigInt(ccaStartBlock),
-		toBlock: currentBlock,
-	}),
+	ccaContract.getEvents.BidSubmitted(
+		{},
+		{
+			fromBlock: ccaStartBlock,
+			toBlock: ccaEndBlock,
+		},
+	),
+	ccaContract.getEvents.TokensClaimed(
+		{},
+		{
+			fromBlock: ccaStartBlock,
+			toBlock: currentBlock,
+		},
+	),
+	ccaContract.getEvents.TokensSwept(
+		{},
+		{
+			fromBlock: ccaStartBlock,
+			toBlock: currentBlock,
+		},
+	),
 ]);
 
 const bidSubmissions = bidLogs.map((l) => ({
@@ -192,73 +155,44 @@ const filledBids = tokensClaims.map((tc) => {
 	};
 });
 
-if (sweepLogs.length === 0) {
-	throw new Error(
-		"No TokensSwept event found. Call sweepUnsoldTokens on the CCA contract first.",
-	);
-}
+assertCondition(
+	sweepLogs.length > 0,
+	"No TokensSwept event found. Call sweepUnsoldTokens on the CCA contract first.",
+);
 const sweep = {
 	recipient: required(
 		sweepLogs[0].args.tokensRecipient,
 		"TokensSwept.tokensRecipient",
 	),
-	amount: required(
-		sweepLogs[0].args.tokensAmount,
-		"TokensSwept.tokensAmount",
-	),
+	amount: required(sweepLogs[0].args.tokensAmount, "TokensSwept.tokensAmount"),
 };
 
-console.log(`  Bids: ${bidSubmissions.length}, Claims: ${tokensClaims.length}`);
-console.log(
-	`  Sweep: ${formatEther(sweep.amount)} tokens to ${sweep.recipient}`,
+assertCondition(
+	await trackerContract.read.saleFullyClaimed(),
+	"Sale is not fully claimed yet. Wait for all claimTokens/sweepUnsoldTokens calls.",
 );
 
-// ── 2. Precondition checks ──────────────────────────────────────────────────
+const onChainDisburser = await trackerContract.read.disburser();
+assertCondition(
+	onChainDisburser.toLowerCase() === disburser.address.toLowerCase(),
+	`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
+);
 
-console.log("\nChecking preconditions...");
-
-const saleFullyClaimed = await publicClient.readContract({
-	address: TRACKER_ADDRESS,
-	abi: trackerAbi,
-	functionName: "saleFullyClaimed",
-});
-if (!saleFullyClaimed) {
-	throw new Error(
-		"Sale is not fully claimed yet. Wait for all claimTokens/sweepUnsoldTokens calls.",
-	);
-}
-
-const onChainDisburser = await publicClient.readContract({
-	address: TRACKER_ADDRESS,
-	abi: trackerAbi,
-	functionName: "disburser",
-});
-if (onChainDisburser.toLowerCase() !== disburser.address.toLowerCase()) {
-	throw new Error(
-		`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
-	);
-}
-
-console.log("  All preconditions met.\n");
-
-// ── 3. Compute the full expected entry list (Step 1 of the plan) ────────────
+// ── 2. Compute the full expected entry list ─────────────────────────────────
 //
 // The tracker only sees pre-bonus CCA amounts. The actual token movements
 // include the bonus, so transferAmount intentionally differs from ccaAmount
 // for whale entries.
 
-console.log("Computing expected disbursement entries...");
-
 const expectedEntries: DisbursementEntry[] = [];
 
 const bidderAddresses = [
-	...new Set(filledBids.map((b) => b.owner)),
-].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+	...new Set(filledBids.map((b) => b.owner.toLowerCase() as Address)),
+].sort();
 
 for (const addr of bidderAddresses) {
-	const bids = filledBids.filter((b) => b.owner === addr);
 	const [whaleBids, normalBids] = splitBy(
-		bids,
+		filledBids.filter((b) => b.owner.toLowerCase() === addr.toLowerCase()),
 		(b) => b.bidBlockNumber < phaseBoundaryBlock,
 	);
 
@@ -269,9 +203,9 @@ for (const addr of bidderAddresses) {
 
 	if (r.ccaNormal > 0n) {
 		expectedEntries.push({
-			trackerRecipient: addr,
-			transferTo: addr,
+			to: addr,
 			ccaAmount: r.ccaNormal,
+			transferTo: addr,
 			transferAmount: r.disbursableNormalImmediately,
 			label: "normal",
 		});
@@ -279,9 +213,9 @@ for (const addr of bidderAddresses) {
 
 	if (r.ccaWhaleImmediate > 0n) {
 		expectedEntries.push({
-			trackerRecipient: addr,
-			transferTo: addr,
+			to: addr,
 			ccaAmount: r.ccaWhaleImmediate,
+			transferTo: addr,
 			transferAmount: r.disbursableWhaleImmediately,
 			label: "whale immediate",
 		});
@@ -289,9 +223,9 @@ for (const addr of bidderAddresses) {
 
 	if (r.ccaWhaleVested > 0n) {
 		expectedEntries.push({
-			trackerRecipient: addr,
-			transferTo: TOKENOPS_ADDRESS,
+			to: addr,
 			ccaAmount: r.ccaWhaleVested,
+			transferTo: TOKENOPS_ADDRESS,
 			transferAmount: r.disbursableWhaleVested,
 			label: "whale vested",
 		});
@@ -300,77 +234,45 @@ for (const addr of bidderAddresses) {
 
 if (sweep.amount > 0n) {
 	expectedEntries.push({
-		trackerRecipient: sweep.recipient,
-		transferTo: sweep.recipient,
+		to: sweep.recipient,
 		ccaAmount: sweep.amount,
+		transferTo: sweep.recipient,
 		transferAmount: sweep.amount,
 		label: "sweep",
 	});
 }
 
-console.log(`  ${expectedEntries.length} expected entries`);
-console.log(
-	`  Total CCA: ${formatEther(sumOf(expectedEntries.map((e) => e.ccaAmount)))}`,
+// ── 3. Discover what Disperse batches have already been executed on-chain ───
+
+const transferLogs = await soldTokenContract.getEvents.Transfer(
+	{
+		from: disburser.address,
+	},
+	{
+		fromBlock: ccaEndBlock,
+		toBlock: currentBlock,
+	},
 );
-console.log(
-	`  Total transfer: ${formatEther(sumOf(expectedEntries.map((e) => e.transferAmount)))}`,
+const observedTransfers = transferLogs.map((l) => ({
+	txHash: l.transactionHash,
+	transferTo: required(l.args.to, "Transfer.to"),
+	transferAmount: required(l.args.value, "Transfer.value"),
+}));
+
+const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
+	{},
+	{
+		fromBlock: ccaEndBlock,
+		toBlock: currentBlock,
+	},
 );
+const observedDisbursements = disbursementLogs.map((l) => ({
+	transferTo: required(l.args.to, "DisbursementCompleted.to"),
+	transferAmount: required(l.args.value, "DisbursementCompleted.value"),
+	txHash: required(l.args.txHash, "DisbursementCompleted.txHash"),
+	txIndex: required(l.args.txIndex, "DisbursementCompleted.txIndex"),
+}));
 
-for (const e of expectedEntries) {
-	console.log(
-		`    ${e.label}: ${e.trackerRecipient} → ${e.transferTo} | CCA ${formatEther(e.ccaAmount)}, transfer ${formatEther(e.transferAmount)}`,
-	);
-}
-
-// ── 4. Check idempotency: compare on-chain transfers to expected (Step 2) ───
-
-console.log("\nChecking on-chain transfer state...");
-
-const transferLogs = await publicClient.getContractEvents({
-	address: TOKEN_ADDRESS,
-	abi: erc20Abi,
-	eventName: "Transfer",
-	args: { from: disburser.address },
-	fromBlock: BigInt(ccaEndBlock),
-	toBlock: currentBlock,
-});
-
-// Filter to only transfers that happened in txs sent to the Disperse contract.
-const uniqueTxHashes = [...new Set(transferLogs.map((l) => l.transactionHash))];
-const txDetails = await Promise.all(
-	uniqueTxHashes.map((hash) => publicClient.getTransaction({ hash })),
-);
-const disperseTxHashes = new Set(
-	txDetails
-		.filter(
-			(tx) =>
-				tx.to?.toLowerCase() === DISPERSE_ADDRESS.toLowerCase(),
-		)
-		.map((tx) => tx.hash),
-);
-
-const disperseTransferLogs = transferLogs.filter((l) =>
-	disperseTxHashes.has(l.transactionHash),
-);
-
-// Group by txHash, preserving log order within each tx.
-const onChainBatches: { txHash: Hex; transfers: { to: Address; amount: bigint }[] }[] = [];
-const batchByTxHash = new Map<Hex, { to: Address; amount: bigint }[]>();
-for (const log of disperseTransferLogs) {
-	const to = required(log.args.to, "Transfer.to") as Address;
-	const amount = required(log.args.value, "Transfer.value");
-	let batch = batchByTxHash.get(log.transactionHash);
-	if (!batch) {
-		batch = [];
-		batchByTxHash.set(log.transactionHash, batch);
-		onChainBatches.push({ txHash: log.transactionHash, transfers: batch });
-	}
-	batch.push({ to, amount });
-}
-
-console.log(
-	`  Found ${onChainBatches.length} existing Disperse batch(es) with ${disperseTransferLogs.length} transfer(s)`,
-);
 
 // Walk expected entries, consuming on-chain batches in order.
 let expectedIdx = 0;
@@ -411,7 +313,7 @@ if (remainingEntries.length === 0) {
 
 console.log("\nChecking tracker recording state...");
 
-const disbursementLogs = await publicClient.getContractEvents({
+const disbursementLogs_ = await publicClient.getContractEvents({
 	address: TRACKER_ADDRESS,
 	abi: trackerAbi,
 	eventName: "DisbursementCompleted",
@@ -430,12 +332,12 @@ for (const log of disbursementLogs) {
 	const to = required(log.args.to, "DisbursementCompleted.to") as Address;
 	const value = required(log.args.value, "DisbursementCompleted.value");
 	if (
-		to.toLowerCase() !== expected.trackerRecipient.toLowerCase() ||
+		to.toLowerCase() !== expected.to.toLowerCase() ||
 		value !== expected.ccaAmount
 	) {
 		throw new Error(
 			`Tracker idempotency broken at entry ${trackerIdx} (${expected.label}):\n` +
-				`  expected: to=${expected.trackerRecipient}, ccaAmount=${expected.ccaAmount}\n` +
+				`  expected: to=${expected.to}, ccaAmount=${expected.ccaAmount}\n` +
 				`  on-chain: to=${to}, value=${value}`,
 		);
 	}
@@ -455,7 +357,7 @@ if (remainingEntries.length > 0) {
 	);
 
 	const disburserBalance = await publicClient.readContract({
-		address: TOKEN_ADDRESS,
+		address: SOLD_TOKEN_ADDRESS,
 		abi: erc20Abi,
 		functionName: "balanceOf",
 		args: [disburser.address],
@@ -476,8 +378,8 @@ if (remainingEntries.length > 0) {
 		console.log(
 			`  Approving Disperse contract for ${formatEther(remainingTransferTotal)} tokens...`,
 		);
-		const approveHash = await walletClient.writeContract({
-			address: TOKEN_ADDRESS,
+		const approveHash = await disburserClient.writeContract({
+			address: SOLD_TOKEN_ADDRESS,
 			abi: erc20Abi,
 			functionName: "approve",
 			args: [DISPERSE_ADDRESS, remainingTransferTotal],
@@ -500,7 +402,7 @@ if (remainingEntries.length > 0) {
 			const batch = remainingEntries.slice(cursor, cursor + batchSize);
 			const disperseRecipients = batch.map((e) => e.transferTo);
 			const disperseAmounts = batch.map((e) => e.transferAmount);
-			const trackerRecipients = batch.map((e) => e.trackerRecipient);
+			const trackerRecipients = batch.map((e) => e.to);
 			const trackerValues = batch.map((e) => e.ccaAmount);
 			const dummyHashes = batch.map(
 				() =>
@@ -514,19 +416,14 @@ if (remainingEntries.length > 0) {
 						address: DISPERSE_ADDRESS,
 						abi: disperseAbi,
 						functionName: "disperseTokenSimple",
-						args: [TOKEN_ADDRESS, disperseRecipients, disperseAmounts],
+						args: [SOLD_TOKEN_ADDRESS, disperseRecipients, disperseAmounts],
 						account: disburser,
 					}),
 					publicClient.estimateContractGas({
 						address: TRACKER_ADDRESS,
 						abi: trackerAbi,
 						functionName: "recordDisbursements",
-						args: [
-							trackerRecipients,
-							trackerValues,
-							dummyHashes,
-							dummyIndices,
-						],
+						args: [trackerRecipients, trackerValues, dummyHashes, dummyIndices],
 						account: disburser,
 					}),
 				]);
@@ -569,24 +466,24 @@ if (remainingEntries.length > 0) {
 		);
 		for (const e of batch) {
 			console.log(
-				`    ${e.label}: ${e.trackerRecipient} → ${e.transferTo} | ${formatEther(e.transferAmount)}`,
+				`    ${e.label}: ${e.to} → ${e.transferTo} | ${formatEther(e.transferAmount)}`,
 			);
 		}
 
 		let disperseTxHash: Hex;
 		if (DRY_RUN) {
 			console.log(
-				`  [dry-run] Would call disperseTokenSimple(${TOKEN_ADDRESS}, [${recipients.join(", ")}], [${amounts.join(", ")}])`,
+				`  [dry-run] Would call disperseTokenSimple(${SOLD_TOKEN_ADDRESS}, [${recipients.join(", ")}], [${amounts.join(", ")}])`,
 			);
 			disperseTxHash =
 				"0x0000000000000000000000000000000000000000000000000000000000000000";
 		} else {
 			console.log("  Executing disperseTokenSimple...");
-			disperseTxHash = await walletClient.writeContract({
+			disperseTxHash = await disburserClient.writeContract({
 				address: DISPERSE_ADDRESS,
 				abi: disperseAbi,
 				functionName: "disperseTokenSimple",
-				args: [TOKEN_ADDRESS, recipients, amounts],
+				args: [SOLD_TOKEN_ADDRESS, recipients, amounts],
 			});
 			await publicClient.waitForTransactionReceipt({
 				hash: disperseTxHash,
@@ -603,15 +500,13 @@ if (remainingEntries.length > 0) {
 				"  Tracker recording already done for this batch (crash recovery).",
 			);
 		} else {
-			const trackerRecipients = batch.map((e) => e.trackerRecipient);
+			const trackerRecipients = batch.map((e) => e.to);
 			const trackerValues = batch.map((e) => e.ccaAmount);
 			const txHashes = batch.map(() => disperseTxHash as `0x${string}`);
 			const txIndices = batch.map((_, i) => BigInt(i));
 
 			if (DRY_RUN) {
-				console.log(
-					"  [dry-run] Would call recordDisbursements with:",
-				);
+				console.log("  [dry-run] Would call recordDisbursements with:");
 				for (let i = 0; i < batch.length; i++) {
 					console.log(
 						`    ${trackerRecipients[i]}: CCA ${formatEther(trackerValues[i])}, txHash ${txHashes[i]}, txIndex ${txIndices[i]}`,
@@ -619,16 +514,11 @@ if (remainingEntries.length > 0) {
 				}
 			} else {
 				console.log("  Recording disbursements on tracker...");
-				const recordHash = await walletClient.writeContract({
+				const recordHash = await disburserClient.writeContract({
 					address: TRACKER_ADDRESS,
 					abi: trackerAbi,
 					functionName: "recordDisbursements",
-					args: [
-						trackerRecipients,
-						trackerValues,
-						txHashes,
-						txIndices,
-					],
+					args: [trackerRecipients, trackerValues, txHashes, txIndices],
 				});
 				await publicClient.waitForTransactionReceipt({
 					hash: recordHash,
