@@ -11,9 +11,20 @@ export function ensureHex(value: string): Hex {
 	return `0x${value}` as Hex;
 };
 
-export function required<T>(value: T | undefined, label: string): T {
-	if (value === undefined) throw new Error(`Missing event field: ${label}`);
-	return value;
+type Defined<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
+
+export function requiredArgs<T extends Record<string, unknown>>(
+	log: { args: T; eventName?: string },
+): Defined<T> {
+	const out = {} as Record<string, unknown>;
+	for (const [key, value] of Object.entries(log.args)) {
+		if (value === undefined)
+			throw new Error(
+				`Missing event field: ${log.eventName ?? "unknown"}.${key}`,
+			);
+		out[key] = value;
+	}
+	return out as Defined<T>;
 }
 
 export function splitBy<T>(items: T[], predicate: (item: T) => boolean): [T[], T[]] {

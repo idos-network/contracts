@@ -17,7 +17,7 @@ import {
 	assertCondition,
 	ensureHex,
 	iso8601ToTimestamp,
-	required,
+	requiredArgs,
 	requireEnv,
 	splitBy,
 	sumOf,
@@ -118,21 +118,16 @@ const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 	),
 ]);
 
-const bidSubmissions = bidLogs.map((l) => ({
-	bidId: required(l.args.id, "BidSubmitted.id"),
-	owner: required(l.args.owner, "BidSubmitted.owner"),
-	blockNumber: l.blockNumber,
-}));
+const bidSubmissions = bidLogs.map((l) => {
+	const { id: bidId, owner } = requiredArgs(l);
+	return { bidId, owner, blockNumber: l.blockNumber };
+});
 
 // TokensClaimed is the only event that matters for token amounts. BidExited
 // records the same tokensFilled value earlier (during exit), but the actual
 // token transfer (and thus the tracker's MissingDisbursementRecorded) only
 // happens at claim time.
-const tokensClaims = claimLogs.map((l) => ({
-	bidId: required(l.args.bidId, "TokensClaimed.bidId"),
-	owner: required(l.args.owner, "TokensClaimed.owner"),
-	tokensFilled: required(l.args.tokensFilled, "TokensClaimed.tokensFilled"),
-}));
+const tokensClaims = claimLogs.map((l) => requiredArgs(l));
 
 const bidSubmissionsIds = new Set(bidSubmissions.map((b) => b.bidId));
 const tokensClaimBidIds = new Set(tokensClaims.map((o) => o.bidId));
@@ -159,12 +154,10 @@ assertCondition(
 	sweepLogs.length > 0,
 	"No TokensSwept event found. Call sweepUnsoldTokens on the CCA contract first.",
 );
+const sweepLog = requiredArgs(sweepLogs[0]);
 const sweep = {
-	recipient: required(
-		sweepLogs[0].args.tokensRecipient,
-		"TokensSwept.tokensRecipient",
-	),
-	amount: required(sweepLogs[0].args.tokensAmount, "TokensSwept.tokensAmount"),
+	recipient: sweepLog.tokensRecipient,
+	amount: sweepLog.tokensAmount,
 };
 
 assertCondition(
@@ -253,11 +246,10 @@ const transferLogs = await soldTokenContract.getEvents.Transfer(
 		toBlock: currentBlock,
 	},
 );
-const observedTransfers = transferLogs.map((l) => ({
-	txHash: l.transactionHash,
-	transferTo: required(l.args.to, "Transfer.to"),
-	transferAmount: required(l.args.value, "Transfer.value"),
-}));
+const observedTransfers = transferLogs.map((l) => {
+	const { to: transferTo, value: transferAmount } = requiredArgs(l);
+	return { txHash: l.transactionHash, transferTo, transferAmount };
+});
 
 const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
 	{},
@@ -266,13 +258,7 @@ const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
 		toBlock: currentBlock,
 	},
 );
-const observedDisbursements = disbursementLogs.map((l) => ({
-	transferTo: required(l.args.to, "DisbursementCompleted.to"),
-	transferAmount: required(l.args.value, "DisbursementCompleted.value"),
-	txHash: required(l.args.txHash, "DisbursementCompleted.txHash"),
-	txIndex: required(l.args.txIndex, "DisbursementCompleted.txIndex"),
-}));
-
+const observedDisbursements = disbursementLogs.map((l) => requiredArgs(l));
 
 // Walk expected entries, consuming on-chain batches in order.
 let expectedIdx = 0;
@@ -329,8 +315,7 @@ for (const log of disbursementLogs) {
 		);
 	}
 	const expected = expectedEntries[trackerIdx];
-	const to = required(log.args.to, "DisbursementCompleted.to") as Address;
-	const value = required(log.args.value, "DisbursementCompleted.value");
+	const { to, value } = requiredArgs(log);
 	if (
 		to.toLowerCase() !== expected.to.toLowerCase() ||
 		value !== expected.ccaAmount
