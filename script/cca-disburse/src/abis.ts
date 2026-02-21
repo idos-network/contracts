@@ -1,19 +1,3 @@
-export const disperseAbi = [
-	{
-		constant: false,
-		inputs: [
-			{ name: "token", type: "address" },
-			{ name: "recipients", type: "address[]" },
-			{ name: "values", type: "uint256[]" },
-		],
-		name: "disperseTokenSimple",
-		outputs: [],
-		payable: false,
-		stateMutability: "nonpayable",
-		type: "function",
-	},
-] as const;
-
 export const trackerAbi = [
 	{
 		type: "event",
@@ -148,16 +132,6 @@ export const erc20Abi = [
 		name: "transfer",
 		inputs: [
 			{ name: "to", type: "address" },
-			{ name: "amount", type: "uint256" },
-		],
-		outputs: [{ name: "", type: "bool" }],
-		stateMutability: "nonpayable",
-	},
-	{
-		type: "function",
-		name: "approve",
-		inputs: [
-			{ name: "spender", type: "address" },
 			{ name: "amount", type: "uint256" },
 		],
 		outputs: [{ name: "", type: "bool" }],

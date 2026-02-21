@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
-import { ccaAbi, disperseAbi, erc20Abi, trackerAbi } from "./abis";
+import { ccaAbi, erc20Abi, trackerAbi } from "./abis";
 import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
 import {
@@ -32,7 +32,6 @@ const DISBURSER_PRIVATE_KEY = requireEnv("DISBURSER_PRIVATE_KEY");
 const TRACKER_ADDRESS = requireEnv("TRACKER_ADDRESS") as Address;
 const CCA_ADDRESS = requireEnv("CCA_ADDRESS") as Address;
 const SOLD_TOKEN_ADDRESS = requireEnv("SOLD_TOKEN_ADDRESS") as Address;
-const DISPERSE_ADDRESS = requireEnv("DISPERSE_ADDRESS") as Address;
 const TOKENOPS_ADDRESS = requireEnv("TOKENOPS_ADDRESS") as Address;
 const NORMAL_PHASE_START = requireEnv("NORMAL_PHASE_START");
 
@@ -235,7 +234,7 @@ if (sweep.amount > 0n) {
 	});
 }
 
-// ── 3. Discover what Disperse batches have already been executed on-chain ───
+// ── 3. Reconcile on-chain transfers against expected entries ─────────────────
 
 const transferLogs = await soldTokenContract.getEvents.Transfer(
 	{
@@ -247,9 +246,41 @@ const transferLogs = await soldTokenContract.getEvents.Transfer(
 	},
 );
 const observedTransfers = transferLogs.map((l) => {
-	const { to: transferTo, value: transferAmount } = requiredArgs(l);
-	return { txHash: l.transactionHash, transferTo, transferAmount };
+	const { to, value } = requiredArgs(l);
+	return { txHash: l.transactionHash, to, amount: value };
 });
+
+if (observedTransfers.length > expectedEntries.length) {
+	throw new Error(
+		`Idempotency broken: found ${observedTransfers.length} on-chain transfers but only ${expectedEntries.length} expected entries.`,
+	);
+}
+
+for (let i = 0; i < observedTransfers.length; i++) {
+	const observed = observedTransfers[i];
+	const expected = expectedEntries[i];
+	if (
+		observed.to.toLowerCase() !== expected.transferTo.toLowerCase() ||
+		observed.amount !== expected.transferAmount
+	) {
+		throw new Error(
+			`Idempotency broken at entry ${i} (${expected.label}):\n` +
+				`  expected: to=${expected.transferTo}, amount=${expected.transferAmount}\n` +
+				`  on-chain: to=${observed.to}, amount=${observed.amount}`,
+		);
+	}
+}
+
+const completedTransfers = observedTransfers.length;
+const remainingEntries = expectedEntries.slice(completedTransfers);
+
+console.log(
+	`  ${completedTransfers} transfers already on-chain, ${remainingEntries.length} remaining`,
+);
+
+// ── 4. Reconcile tracker recordings against expected entries ────────────────
+
+console.log("\nChecking tracker recording state...");
 
 const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
 	{},
@@ -258,85 +289,38 @@ const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
 		toBlock: currentBlock,
 	},
 );
-const observedDisbursements = disbursementLogs.map((l) => requiredArgs(l));
 
-// Walk expected entries, consuming on-chain batches in order.
-let expectedIdx = 0;
-for (const batch of onChainBatches) {
-	for (const transfer of batch.transfers) {
-		if (expectedIdx >= expectedEntries.length) {
-			throw new Error(
-				`Idempotency broken: found on-chain transfer (to=${transfer.to}, amount=${transfer.amount}) beyond expected entry list.`,
-			);
-		}
-		const expected = expectedEntries[expectedIdx];
-		if (
-			transfer.to.toLowerCase() !== expected.transferTo.toLowerCase() ||
-			transfer.amount !== expected.transferAmount
-		) {
-			throw new Error(
-				`Idempotency broken at entry ${expectedIdx} (${expected.label}):\n` +
-					`  expected: to=${expected.transferTo}, amount=${expected.transferAmount}\n` +
-					`  on-chain: to=${transfer.to}, amount=${transfer.amount}`,
-			);
-		}
-		expectedIdx++;
-	}
+if (disbursementLogs.length > expectedEntries.length) {
+	throw new Error(
+		"Idempotency broken: more DisbursementCompleted events on-chain than expected entries.",
+	);
 }
 
-const completedEntries = expectedIdx;
-const remainingEntries = expectedEntries.slice(completedEntries);
-
-console.log(
-	`  ${completedEntries} entries already on-chain, ${remainingEntries.length} remaining`,
-);
-
-if (remainingEntries.length === 0) {
-	console.log("\nAll transfers already executed on-chain.");
-}
-
-// ── 5. Check tracker recording idempotency (Step 4 read/reconcile) ──────────
-
-console.log("\nChecking tracker recording state...");
-
-const disbursementLogs_ = await publicClient.getContractEvents({
-	address: TRACKER_ADDRESS,
-	abi: trackerAbi,
-	eventName: "DisbursementCompleted",
-	fromBlock: BigInt(ccaEndBlock),
-	toBlock: currentBlock,
-});
-
-let trackerIdx = 0;
-for (const log of disbursementLogs) {
-	if (trackerIdx >= expectedEntries.length) {
-		throw new Error(
-			"Idempotency broken: more DisbursementCompleted events on-chain than expected entries.",
-		);
-	}
-	const expected = expectedEntries[trackerIdx];
-	const { to, value } = requiredArgs(log);
+for (let i = 0; i < disbursementLogs.length; i++) {
+	const expected = expectedEntries[i];
+	const { to, value } = requiredArgs(disbursementLogs[i]);
 	if (
 		to.toLowerCase() !== expected.to.toLowerCase() ||
 		value !== expected.ccaAmount
 	) {
 		throw new Error(
-			`Tracker idempotency broken at entry ${trackerIdx} (${expected.label}):\n` +
+			`Tracker idempotency broken at entry ${i} (${expected.label}):\n` +
 				`  expected: to=${expected.to}, ccaAmount=${expected.ccaAmount}\n` +
 				`  on-chain: to=${to}, value=${value}`,
 		);
 	}
-	trackerIdx++;
 }
 
-const trackerRecordedCount = trackerIdx;
+const trackerRecordedCount = disbursementLogs.length;
 console.log(
 	`  ${trackerRecordedCount} entries already recorded on tracker, ${expectedEntries.length - trackerRecordedCount} remaining`,
 );
 
-// ── 6. Execute remaining Disperse batches and record on tracker (Steps 3&4) ─
+// ── 5. Execute remaining transfers and record on tracker ────────────────────
 
-if (remainingEntries.length > 0) {
+if (remainingEntries.length === 0) {
+	console.log("\nAll transfers already executed on-chain.");
+} else {
 	const remainingTransferTotal = sumOf(
 		remainingEntries.map((e) => e.transferAmount),
 	);
@@ -358,161 +342,49 @@ if (remainingEntries.length > 0) {
 		`\n  Disburser balance: ${formatEther(disburserBalance)}, needed: ${formatEther(remainingTransferTotal)}`,
 	);
 
-	// Approve Disperse to spend the remaining total.
-	if (!DRY_RUN) {
+	let globalEntryIdx = completedTransfers;
+	for (const entry of remainingEntries) {
 		console.log(
-			`  Approving Disperse contract for ${formatEther(remainingTransferTotal)} tokens...`,
+			`\n  ${entry.label}: ${entry.to} → ${entry.transferTo} | ${formatEther(entry.transferAmount)}`,
 		);
-		const approveHash = await disburserClient.writeContract({
-			address: SOLD_TOKEN_ADDRESS,
-			abi: erc20Abi,
-			functionName: "approve",
-			args: [DISPERSE_ADDRESS, remainingTransferTotal],
-		});
-		await publicClient.waitForTransactionReceipt({ hash: approveHash });
-		console.log(`    tx: ${approveHash}`);
-	} else {
-		console.log(
-			`  [dry-run] Would approve Disperse for ${formatEther(remainingTransferTotal)} tokens`,
-		);
-	}
 
-	// Chunk remaining entries into batches using gas estimation.
-	const batches: DisbursementEntry[][] = [];
-	let cursor = 0;
-	while (cursor < remainingEntries.length) {
-		let batchSize = remainingEntries.length - cursor;
-
-		while (batchSize > 0) {
-			const batch = remainingEntries.slice(cursor, cursor + batchSize);
-			const disperseRecipients = batch.map((e) => e.transferTo);
-			const disperseAmounts = batch.map((e) => e.transferAmount);
-			const trackerRecipients = batch.map((e) => e.to);
-			const trackerValues = batch.map((e) => e.ccaAmount);
-			const dummyHashes = batch.map(
-				() =>
-					"0x0000000000000000000000000000000000000000000000000000000000000000" as Hex,
-			);
-			const dummyIndices = batch.map((_, i) => BigInt(i));
-
-			try {
-				const [disperseGas, trackerGas] = await Promise.all([
-					publicClient.estimateContractGas({
-						address: DISPERSE_ADDRESS,
-						abi: disperseAbi,
-						functionName: "disperseTokenSimple",
-						args: [SOLD_TOKEN_ADDRESS, disperseRecipients, disperseAmounts],
-						account: disburser,
-					}),
-					publicClient.estimateContractGas({
-						address: TRACKER_ADDRESS,
-						abi: trackerAbi,
-						functionName: "recordDisbursements",
-						args: [trackerRecipients, trackerValues, dummyHashes, dummyIndices],
-						account: disburser,
-					}),
-				]);
-
-				const maxGas = disperseGas > trackerGas ? disperseGas : trackerGas;
-				// Arbitrum has high gas limits; use 80% of block gas as safety margin.
-				const block = await publicClient.getBlock();
-				if (maxGas < (block.gasLimit * 80n) / 100n) {
-					break;
-				}
-			} catch {
-				// Gas estimation failed (likely too large), reduce batch size.
-			}
-
-			batchSize = Math.floor(batchSize / 2);
-			if (batchSize === 0) {
-				throw new Error(
-					"Cannot fit even a single entry in a batch. Gas estimation keeps failing.",
-				);
-			}
-		}
-
-		batches.push(remainingEntries.slice(cursor, cursor + batchSize));
-		cursor += batchSize;
-	}
-
-	console.log(
-		`\n  Split into ${batches.length} batch(es): [${batches.map((b) => b.length).join(", ")}]`,
-	);
-
-	// Execute each batch: Disperse, then immediately record on tracker.
-	let globalEntryIdx = completedEntries;
-	for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-		const batch = batches[batchIdx];
-		const recipients = batch.map((e) => e.transferTo);
-		const amounts = batch.map((e) => e.transferAmount);
-
-		console.log(
-			`\n  Batch ${batchIdx + 1}/${batches.length} (${batch.length} entries):`,
-		);
-		for (const e of batch) {
-			console.log(
-				`    ${e.label}: ${e.to} → ${e.transferTo} | ${formatEther(e.transferAmount)}`,
-			);
-		}
-
-		let disperseTxHash: Hex;
+		let txHash: Hex;
 		if (DRY_RUN) {
 			console.log(
-				`  [dry-run] Would call disperseTokenSimple(${SOLD_TOKEN_ADDRESS}, [${recipients.join(", ")}], [${amounts.join(", ")}])`,
+				`    [dry-run] Would transfer ${formatEther(entry.transferAmount)} to ${entry.transferTo}`,
 			);
-			disperseTxHash =
+			txHash =
 				"0x0000000000000000000000000000000000000000000000000000000000000000";
 		} else {
-			console.log("  Executing disperseTokenSimple...");
-			disperseTxHash = await disburserClient.writeContract({
-				address: DISPERSE_ADDRESS,
-				abi: disperseAbi,
-				functionName: "disperseTokenSimple",
-				args: [SOLD_TOKEN_ADDRESS, recipients, amounts],
+			txHash = await disburserClient.writeContract({
+				address: SOLD_TOKEN_ADDRESS,
+				abi: erc20Abi,
+				functionName: "transfer",
+				args: [entry.transferTo, entry.transferAmount],
 			});
-			await publicClient.waitForTransactionReceipt({
-				hash: disperseTxHash,
-			});
-			console.log(`    tx: ${disperseTxHash}`);
+			await publicClient.waitForTransactionReceipt({ hash: txHash });
+			console.log(`    transfer tx: ${txHash}`);
 		}
 
-		// Check if this batch's tracker recording is already done (crash recovery).
-		const batchTrackerEnd = globalEntryIdx + batch.length;
-		const alreadyRecorded = batchTrackerEnd <= trackerRecordedCount;
-
+		const alreadyRecorded = globalEntryIdx < trackerRecordedCount;
 		if (alreadyRecorded) {
+			console.log("    Tracker recording already present (crash recovery).");
+		} else if (DRY_RUN) {
 			console.log(
-				"  Tracker recording already done for this batch (crash recovery).",
+				`    [dry-run] Would record: ${entry.to} CCA ${formatEther(entry.ccaAmount)}, txHash ${txHash}, txIndex 0`,
 			);
 		} else {
-			const trackerRecipients = batch.map((e) => e.to);
-			const trackerValues = batch.map((e) => e.ccaAmount);
-			const txHashes = batch.map(() => disperseTxHash as `0x${string}`);
-			const txIndices = batch.map((_, i) => BigInt(i));
-
-			if (DRY_RUN) {
-				console.log("  [dry-run] Would call recordDisbursements with:");
-				for (let i = 0; i < batch.length; i++) {
-					console.log(
-						`    ${trackerRecipients[i]}: CCA ${formatEther(trackerValues[i])}, txHash ${txHashes[i]}, txIndex ${txIndices[i]}`,
-					);
-				}
-			} else {
-				console.log("  Recording disbursements on tracker...");
-				const recordHash = await disburserClient.writeContract({
-					address: TRACKER_ADDRESS,
-					abi: trackerAbi,
-					functionName: "recordDisbursements",
-					args: [trackerRecipients, trackerValues, txHashes, txIndices],
-				});
-				await publicClient.waitForTransactionReceipt({
-					hash: recordHash,
-				});
-				console.log(`    tx: ${recordHash}`);
-			}
+			const recordHash = await disburserClient.writeContract({
+				address: TRACKER_ADDRESS,
+				abi: trackerAbi,
+				functionName: "recordDisbursements",
+				args: [[entry.to], [entry.ccaAmount], [txHash], [0n]],
+			});
+			await publicClient.waitForTransactionReceipt({ hash: recordHash });
+			console.log(`    tracker tx: ${recordHash}`);
 		}
 
-		globalEntryIdx = batchTrackerEnd;
+		globalEntryIdx++;
 	}
 }
 
