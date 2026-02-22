@@ -44,9 +44,9 @@ uint256 constant MAX_ALLOWABLE_DUST_WEI = 1;
  * Note well: `claimTokensBatch` makes things harder to track 1:1 with this contract, since that can make a single
  * transfer that contains bids from different phases of the sale.
  *
- * The disburser should call the `recordDisbursements` function to record disbursements, providing the txHash where the
- * actual disbursement took place and the amount disbursed, so that the original token distribution can be verified. A
- * disburser might choose to split disbursements in tranches, either because the allocation was done in different
+ * The disburser should call the `recordDisbursement` function to record each disbursement, providing the txHash where
+ * the actual disbursement took place and the amount disbursed, so that the original token distribution can be verified.
+ * A disburser might choose to split disbursements in tranches, either because the allocation was done in different
  * phases of the sales, or for any other reason. The uniqueness and non-zero-ness of txHash isn't enforced
  * by design to allow for flexibility in the disburser's strategy.
  */
@@ -152,7 +152,7 @@ contract CCADisbursementTracker is ERC20 {
     }
 
     /// @notice Returns true when the sale is fully disbursed (total supply is zero and all missing disbursements recorded).
-    /// @dev Expects sweepUnsoldTokens to have been called, all bid tokens claimed, and all disbursements recorded via recordDisbursements.
+    /// @dev Expects sweepUnsoldTokens to have been called, all bid tokens claimed, and all disbursements recorded via recordDisbursement.
     function saleFullyDisbursed() public view returns (bool) {
         return saleFullyClaimed() && _totalMissingDisbursements == 0;
     }
@@ -165,11 +165,9 @@ contract CCADisbursementTracker is ERC20 {
     /// @notice A recorded disbursement with its amount and transaction reference.
     /// @param value Amount disbursed
     /// @param txHash Transaction hash where the on-chain disbursement occurred
-    /// @param txIndex Index of this disbursement within the batch transaction (e.g., position in a Disperse call)
     struct Disbursement {
         uint256 value;
         bytes32 txHash;
-        uint256 txIndex;
     }
     /// @dev Per-account list of recorded disbursements for verification.
     mapping(address account => Disbursement[]) private _disbursements;
@@ -179,10 +177,9 @@ contract CCADisbursementTracker is ERC20 {
     error OnlyDisburserCanRecordDisbursements();
     error OverdisbursementDetected();
     error SaleNotFullyClaimed();
-    error ArrayLengthMismatch();
 
     event MissingDisbursementRecorded(address indexed to, uint256 value);
-    event DisbursementCompleted(address indexed to, uint256 value, bytes32 txHash, uint256 txIndex);
+    event DisbursementCompleted(address indexed to, uint256 value, bytes32 txHash);
 
     /// @dev Records a missing disbursement when the CCA transfers tokens to a holder during the sale.
     /// @param to Address that should receive the disbursement.
@@ -247,43 +244,26 @@ contract CCADisbursementTracker is ERC20 {
         return result;
     }
 
-    /// @notice Records disbursements made off-chain, reducing the missing disbursement balances.
+    /// @notice Records a single disbursement made off-chain, reducing the missing disbursement balance.
     /// @dev Only callable by the disburser after the sale is fully claimed. Reverts on overdisbursement or zero amounts.
-    /// @param recipients Addresses to record disbursements for
-    /// @param values Amounts disbursed to each recipient
-    /// @param txHashes Transaction hashes where the on-chain disbursements occurred
-    /// @param txIndices Index of each disbursement within its batch transaction (e.g., position in a Disperse call)
-    function recordDisbursements(
-        address[] calldata recipients,
-        uint256[] calldata values,
-        bytes32[] calldata txHashes,
-        uint256[] calldata txIndices
-    ) external {
+    /// @param to Address the disbursement was made to
+    /// @param value Amount disbursed
+    /// @param txHash Transaction hash where the on-chain disbursement occurred
+    function recordDisbursement(address to, uint256 value, bytes32 txHash) external {
         if (!saleFullyClaimed()) revert SaleNotFullyClaimed();
         if (msg.sender != _DISBURSER) revert OnlyDisburserCanRecordDisbursements();
-        uint256 len = recipients.length;
-        if (len != values.length || len != txHashes.length || len != txIndices.length) revert ArrayLengthMismatch();
+        if (to == address(0)) revert NoZeroAddressRecipientAllowed();
+        if (value == 0) revert NoZeroDisbursementsAllowed();
+        if (_missingDisbursements[to] < value) revert OverdisbursementDetected();
+        // txHash is intentionally not checked for 0x0 or uniqueness to allow for flexibility.
 
-        for (uint256 i; i < len;) {
-            address to = recipients[i];
-            uint256 value = values[i];
-            if (to == address(0)) revert NoZeroAddressRecipientAllowed();
-            if (value == 0) revert NoZeroDisbursementsAllowed();
-            if (_missingDisbursements[to] < value) revert OverdisbursementDetected();
-            // txHash and txIndex are intentionally not checked for 0x0 or uniqueness to allow for flexibility.
-
-            unchecked {
-                _missingDisbursements[to] -= value;
-            }
-            _totalMissingDisbursements -= value;
-            _disbursements[to].push(Disbursement({value: value, txHash: txHashes[i], txIndex: txIndices[i]}));
-
-            emit DisbursementCompleted(to, value, txHashes[i], txIndices[i]);
-
-            unchecked {
-                ++i;
-            }
+        unchecked {
+            _missingDisbursements[to] -= value;
         }
+        _totalMissingDisbursements -= value;
+        _disbursements[to].push(Disbursement({value: value, txHash: txHash}));
+
+        emit DisbursementCompleted(to, value, txHash);
     }
 
     /// @dev Reverts; this contract does not accept ETH.

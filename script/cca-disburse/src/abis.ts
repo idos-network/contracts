@@ -14,17 +14,15 @@ export const trackerAbi = [
 			{ name: "to", type: "address", indexed: true },
 			{ name: "value", type: "uint256", indexed: false },
 			{ name: "txHash", type: "bytes32", indexed: false },
-			{ name: "txIndex", type: "uint256", indexed: false },
 		],
 	},
 	{
 		type: "function",
-		name: "recordDisbursements",
+		name: "recordDisbursement",
 		inputs: [
-			{ name: "recipients", type: "address[]" },
-			{ name: "values", type: "uint256[]" },
-			{ name: "txHashes", type: "bytes32[]" },
-			{ name: "txIndices", type: "uint256[]" },
+			{ name: "to", type: "address" },
+			{ name: "value", type: "uint256" },
+			{ name: "txHash", type: "bytes32" },
 		],
 		outputs: [],
 		stateMutability: "nonpayable",
@@ -117,6 +115,32 @@ export const ccaAbi = [
 	},
 ] as const;
 
+export const whaleDisburserAbi = [
+	{
+		type: "event",
+		name: "Disbursed",
+		inputs: [
+			{ name: "beneficiary", type: "address", indexed: true },
+			{ name: "totalAmount", type: "uint256", indexed: false },
+			{ name: "immediateAmount", type: "uint256", indexed: false },
+			{ name: "vestingWallet", type: "address", indexed: false },
+			{ name: "vestedAmount", type: "uint256", indexed: false },
+		],
+	},
+	{
+		type: "function",
+		name: "disburse",
+		inputs: [
+			{ name: "token", type: "address" },
+			{ name: "beneficiary", type: "address" },
+			{ name: "totalAmount", type: "uint256" },
+			{ name: "vestingStart", type: "uint64" },
+		],
+		outputs: [{ name: "", type: "address" }],
+		stateMutability: "nonpayable",
+	},
+] as const;
+
 export const erc20Abi = [
 	{
 		type: "event",
@@ -139,8 +163,28 @@ export const erc20Abi = [
 	},
 	{
 		type: "function",
+		name: "approve",
+		inputs: [
+			{ name: "spender", type: "address" },
+			{ name: "amount", type: "uint256" },
+		],
+		outputs: [{ name: "", type: "bool" }],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
 		name: "balanceOf",
 		inputs: [{ name: "account", type: "address" }],
+		outputs: [{ name: "", type: "uint256" }],
+		stateMutability: "view",
+	},
+	{
+		type: "function",
+		name: "allowance",
+		inputs: [
+			{ name: "owner", type: "address" },
+			{ name: "spender", type: "address" },
+		],
 		outputs: [{ name: "", type: "uint256" }],
 		stateMutability: "view",
 	},

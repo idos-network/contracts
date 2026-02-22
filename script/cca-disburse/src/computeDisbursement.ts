@@ -1,14 +1,11 @@
 export const BPS_BASE = 100_00n; // 100.00%
 export const WHALE_BONUS_BPS = 20_00n; // 20.00% bonus
-export const WHALE_IMMEDIATE_BPS = 25_00n; // 25.00% of bonus-adjusted total
 
 export interface BidderDisbursement {
-  ccaWhaleImmediate: bigint;
-  ccaWhaleVested: bigint;
+  ccaWhale: bigint;
   ccaNormal: bigint;
-  disbursableWhaleImmediately: bigint;
-  disbursableWhaleVested: bigint;
-  disbursableNormalImmediately: bigint;
+  disbursableWhale: bigint;
+  disbursableNormal: bigint;
 }
 
 /**
@@ -17,23 +14,19 @@ export interface BidderDisbursement {
  *
  * The tracker only sees pre-bonus CCA amounts. The actual token movements
  * include the 20% whale bonus, so tx amounts intentionally differ from
- * tracker record amounts.
+ * tracker record amounts. The 1/6 immediate + 5/6 vested split is handled
+ * on-chain by the WhaleDisburser contract.
  */
 export function computeDisbursement(
   ccaWhale: bigint,
   ccaNormal: bigint,
 ): BidderDisbursement {
-  const ccaWhaleImmediate = (ccaWhale * WHALE_IMMEDIATE_BPS) / BPS_BASE;
-  const ccaWhaleVested = ccaWhale - ccaWhaleImmediate;
-
   const bonusMultiplier = BPS_BASE + WHALE_BONUS_BPS;
 
   return {
-    ccaWhaleImmediate,
-    ccaWhaleVested,
+    ccaWhale,
     ccaNormal,
-    disbursableWhaleImmediately: (ccaWhaleImmediate * bonusMultiplier) / BPS_BASE,
-    disbursableWhaleVested: (ccaWhaleVested * bonusMultiplier) / BPS_BASE,
-    disbursableNormalImmediately: ccaNormal,
+    disbursableWhale: (ccaWhale * bonusMultiplier) / BPS_BASE,
+    disbursableNormal: ccaNormal,
   };
 }

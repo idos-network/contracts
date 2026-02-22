@@ -32,17 +32,8 @@ contract DisbursementHandler is Test {
 
         uint256 value = bound(valueSeed, 1, available);
 
-        address[] memory r = new address[](1);
-        uint256[] memory v = new uint256[](1);
-        bytes32[] memory t = new bytes32[](1);
-        uint256[] memory idx = new uint256[](1);
-        r[0] = recipient;
-        v[0] = value;
-        t[0] = txHash;
-        idx[0] = 0;
-
         vm.prank(disburser);
-        tracker.recordDisbursements(r, v, t, idx);
+        tracker.recordDisbursement(recipient, value, txHash);
 
         ghostTotalDisbursed += value;
         ghostDisbursedTo[recipient] += value;

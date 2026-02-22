@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
-import { ccaAbi, erc20Abi, trackerAbi } from "./abis";
+import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis";
 import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
 import {
@@ -25,15 +25,18 @@ import {
 
 const DRY_RUN = process.argv.includes("--dry-run");
 if (DRY_RUN)
-	console.log("*** DRY RUN — no transactions will be broadcast ***\n");
+	console.log("[dry-run] Dry run enabled. No transactions will be broadcast.");
 
 const RPC_URL = requireEnv("RPC_URL");
 const DISBURSER_PRIVATE_KEY = requireEnv("DISBURSER_PRIVATE_KEY");
 const TRACKER_ADDRESS = requireEnv("TRACKER_ADDRESS") as Address;
 const CCA_ADDRESS = requireEnv("CCA_ADDRESS") as Address;
 const SOLD_TOKEN_ADDRESS = requireEnv("SOLD_TOKEN_ADDRESS") as Address;
-const TOKENOPS_ADDRESS = requireEnv("TOKENOPS_ADDRESS") as Address;
+const WHALE_DISBURSER_ADDRESS = requireEnv(
+	"WHALE_DISBURSER_ADDRESS",
+) as Address;
 const NORMAL_PHASE_START = requireEnv("NORMAL_PHASE_START");
+const VESTING_START = BigInt(requireEnv("VESTING_START"));
 
 const disburser = privateKeyToAccount(ensureHex(DISBURSER_PRIVATE_KEY));
 
@@ -66,12 +69,110 @@ const soldTokenContract = getContract({
 	client: disburserClient,
 });
 
+const whaleDisburserContract = getContract({
+	address: WHALE_DISBURSER_ADDRESS,
+	abi: whaleDisburserAbi,
+	client: disburserClient,
+});
+
 interface DisbursementEntry {
+	kind: "normal" | "whale" | "sweep";
 	to: Address;
-	transferTo: Address;
-	ccaAmount: bigint;
 	transferAmount: bigint;
-	label: string;
+	ccaAmount: bigint;
+}
+
+const ZERO_HASH: Hex =
+	"0x0000000000000000000000000000000000000000000000000000000000000000";
+
+async function executeWhaleDisburse(to: Address, amount: bigint): Promise<Hex> {
+	if (DRY_RUN) {
+		console.log(
+			`[dry-run] WhaleDisburser.disburse(${to}, ${formatEther(amount)})`,
+		);
+		return ZERO_HASH;
+	}
+	const hash = await whaleDisburserContract.write.disburse([
+		SOLD_TOKEN_ADDRESS,
+		to,
+		amount,
+		VESTING_START,
+	]);
+	await publicClient.waitForTransactionReceipt({ hash });
+	return hash;
+}
+
+async function approveWhaleDisburser(amount: bigint): Promise<void> {
+	const currentAllowance = await soldTokenContract.read.allowance([
+		disburser.address,
+		WHALE_DISBURSER_ADDRESS,
+	]);
+	if (currentAllowance >= amount) return;
+
+	if (DRY_RUN) {
+		console.log(`[dry-run] approve WhaleDisburser for ${formatEther(amount)}`);
+		return;
+	}
+	const hash = await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]);
+	await publicClient.waitForTransactionReceipt({ hash });
+}
+
+async function executeTransfer(to: Address, amount: bigint): Promise<Hex> {
+	if (DRY_RUN) {
+		console.log(`[dry-run] transfer ${formatEther(amount)} to ${to}`);
+		return ZERO_HASH;
+	}
+	const hash = await soldTokenContract.write.transfer([to, amount]);
+	await publicClient.waitForTransactionReceipt({ hash });
+	return hash;
+}
+
+async function recordOnTracker(
+	to: Address,
+	ccaAmount: bigint,
+	txHash: Hex,
+): Promise<void> {
+	if (DRY_RUN) {
+		console.log(`[dry-run] record ${to} CCA ${formatEther(ccaAmount)}`);
+		return;
+	}
+	const hash = await trackerContract.write.recordDisbursement([
+		to,
+		ccaAmount,
+		txHash,
+	]);
+	await publicClient.waitForTransactionReceipt({ hash });
+}
+
+async function findUnrecordedTransfer(
+	entry: DisbursementEntry,
+	fromBlock: bigint,
+): Promise<Hex | null> {
+	if (DRY_RUN) return null;
+
+	if (entry.kind === "whale") {
+		const logs = await whaleDisburserContract.getEvents.Disbursed(
+			{ beneficiary: entry.to },
+			{ fromBlock, toBlock: "latest" },
+		);
+		const match = logs.find((l) => l.args.totalAmount === entry.transferAmount);
+		if (!match) return null;
+		return match.transactionHash;
+	} else {
+		const logs = await soldTokenContract.getEvents.Transfer(
+			{ from: disburser.address, to: entry.to },
+			{ fromBlock, toBlock: "latest" },
+		);
+		const match = logs.find((l) => l.args.value === entry.transferAmount);
+		if (!match) return null;
+		return match.transactionHash;
+	}
+}
+
+function executeEntry(entry: DisbursementEntry): Promise<Hex> {
+	return entry.kind === "whale"
+		? executeWhaleDisburse(entry.to, entry.transferAmount)
+		: executeTransfer(entry.to, entry.transferAmount);
 }
 
 // ── 1. Fetch CCA data, resolve phase boundary, compute filled bids ──────────
@@ -96,24 +197,15 @@ const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 	ccaContract.getEvents.BidSubmitted(
 		{},
-		{
-			fromBlock: ccaStartBlock,
-			toBlock: ccaEndBlock,
-		},
+		{ fromBlock: ccaStartBlock, toBlock: ccaEndBlock },
 	),
 	ccaContract.getEvents.TokensClaimed(
 		{},
-		{
-			fromBlock: ccaStartBlock,
-			toBlock: currentBlock,
-		},
+		{ fromBlock: ccaStartBlock, toBlock: currentBlock },
 	),
 	ccaContract.getEvents.TokensSwept(
 		{},
-		{
-			fromBlock: ccaStartBlock,
-			toBlock: currentBlock,
-		},
+		{ fromBlock: ccaStartBlock, toBlock: currentBlock },
 	),
 ]);
 
@@ -161,7 +253,7 @@ const sweep = {
 
 assertCondition(
 	await trackerContract.read.saleFullyClaimed(),
-	"Sale is not fully claimed yet. Wait for all claimTokens/sweepUnsoldTokens calls.",
+	"Sale is not fully claimed yet. Wait for all claimTokens and sweepUnsoldTokens to be called.",
 );
 
 const onChainDisburser = await trackerContract.read.disburser();
@@ -193,108 +285,50 @@ for (const addr of bidderAddresses) {
 		sumOf(normalBids.map((b) => b.tokensFilled)),
 	);
 
+	if (r.ccaWhale > 0n) {
+		expectedEntries.push({
+			kind: "whale",
+			to: addr,
+			ccaAmount: r.ccaWhale,
+			transferAmount: r.disbursableWhale,
+		});
+	}
+
 	if (r.ccaNormal > 0n) {
 		expectedEntries.push({
+			kind: "normal",
 			to: addr,
 			ccaAmount: r.ccaNormal,
-			transferTo: addr,
-			transferAmount: r.disbursableNormalImmediately,
-			label: "normal",
-		});
-	}
-
-	if (r.ccaWhaleImmediate > 0n) {
-		expectedEntries.push({
-			to: addr,
-			ccaAmount: r.ccaWhaleImmediate,
-			transferTo: addr,
-			transferAmount: r.disbursableWhaleImmediately,
-			label: "whale immediate",
-		});
-	}
-
-	if (r.ccaWhaleVested > 0n) {
-		expectedEntries.push({
-			to: addr,
-			ccaAmount: r.ccaWhaleVested,
-			transferTo: TOKENOPS_ADDRESS,
-			transferAmount: r.disbursableWhaleVested,
-			label: "whale vested",
+			transferAmount: r.disbursableNormal,
 		});
 	}
 }
 
 if (sweep.amount > 0n) {
 	expectedEntries.push({
+		kind: "sweep",
 		to: sweep.recipient,
 		ccaAmount: sweep.amount,
-		transferTo: sweep.recipient,
 		transferAmount: sweep.amount,
-		label: "sweep",
 	});
 }
 
-// ── 3. Reconcile on-chain transfers against expected entries ─────────────────
-
-const transferLogs = await soldTokenContract.getEvents.Transfer(
-	{
-		from: disburser.address,
-	},
-	{
-		fromBlock: ccaEndBlock,
-		toBlock: currentBlock,
-	},
-);
-const observedTransfers = transferLogs.map((l) => {
-	const { to, value } = requiredArgs(l);
-	return { txHash: l.transactionHash, to, amount: value };
-});
-
-if (observedTransfers.length > expectedEntries.length) {
-	throw new Error(
-		`Idempotency broken: found ${observedTransfers.length} on-chain transfers but only ${expectedEntries.length} expected entries.`,
-	);
-}
-
-for (let i = 0; i < observedTransfers.length; i++) {
-	const observed = observedTransfers[i];
-	const expected = expectedEntries[i];
-	if (
-		observed.to.toLowerCase() !== expected.transferTo.toLowerCase() ||
-		observed.amount !== expected.transferAmount
-	) {
-		throw new Error(
-			`Idempotency broken at entry ${i} (${expected.label}):\n` +
-				`  expected: to=${expected.transferTo}, amount=${expected.transferAmount}\n` +
-				`  on-chain: to=${observed.to}, amount=${observed.amount}`,
-		);
-	}
-}
-
-const completedTransfers = observedTransfers.length;
-const remainingEntries = expectedEntries.slice(completedTransfers);
-
-console.log(
-	`  ${completedTransfers} transfers already on-chain, ${remainingEntries.length} remaining`,
-);
-
-// ── 4. Reconcile tracker recordings against expected entries ────────────────
-
-console.log("\nChecking tracker recording state...");
+// ── 3. Reconcile on-chain tracker recordings against expected entries ────────
+//
+// DisbursementCompleted events are the single source of truth for progress.
+// Each entry produces one transfer (or whale disburse) and one tracker recording,
+// always in that order. If we crash between the two, we detect the unrecorded
+// transfer on the next run and resume from the tracker recording step.
 
 const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
 	{},
-	{
-		fromBlock: ccaEndBlock,
-		toBlock: currentBlock,
-	},
+	{ fromBlock: ccaEndBlock, toBlock: currentBlock },
 );
 
-if (disbursementLogs.length > expectedEntries.length) {
-	throw new Error(
-		"Idempotency broken: more DisbursementCompleted events on-chain than expected entries.",
-	);
-}
+assertCondition(
+	disbursementLogs.length <= expectedEntries.length,
+	`Idempotency broken: found ${disbursementLogs.length} DisbursementCompleted events but only ${expectedEntries.length} entries expected.`,
+);
 
 for (let i = 0; i < disbursementLogs.length; i++) {
 	const expected = expectedEntries[i];
@@ -304,99 +338,58 @@ for (let i = 0; i < disbursementLogs.length; i++) {
 		value !== expected.ccaAmount
 	) {
 		throw new Error(
-			`Tracker idempotency broken at entry ${i} (${expected.label}):\n` +
+			`Idempotency broken at entry ${i} (${expected.kind}):\n` +
 				`  expected: to=${expected.to}, ccaAmount=${expected.ccaAmount}\n` +
 				`  on-chain: to=${to}, value=${value}`,
 		);
 	}
 }
 
-const trackerRecordedCount = disbursementLogs.length;
-console.log(
-	`  ${trackerRecordedCount} entries already recorded on tracker, ${expectedEntries.length - trackerRecordedCount} remaining`,
-);
+const completedCount = disbursementLogs.length;
+const remainingEntries = expectedEntries.slice(completedCount);
 
-// ── 5. Execute remaining transfers and record on tracker ────────────────────
+// ── 4. Execute remaining entries and record on tracker ──────────────────────
 
-if (remainingEntries.length === 0) {
-	console.log("\nAll transfers already executed on-chain.");
-} else {
-	const remainingTransferTotal = sumOf(
+if (remainingEntries.length > 0) {
+	const remainingTokenTotal = sumOf(
 		remainingEntries.map((e) => e.transferAmount),
 	);
-
-	const disburserBalance = await publicClient.readContract({
-		address: SOLD_TOKEN_ADDRESS,
-		abi: erc20Abi,
-		functionName: "balanceOf",
-		args: [disburser.address],
-	});
-
-	if (disburserBalance < remainingTransferTotal) {
-		throw new Error(
-			`Insufficient token balance. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTransferTotal)}.`,
-		);
-	}
-
-	console.log(
-		`\n  Disburser balance: ${formatEther(disburserBalance)}, needed: ${formatEther(remainingTransferTotal)}`,
+	const disburserBalance = await soldTokenContract.read.balanceOf([
+		disburser.address,
+	]);
+	assertCondition(
+		disburserBalance >= remainingTokenTotal,
+		`Insufficient token balance. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
 	);
 
-	let globalEntryIdx = completedTransfers;
+	// Crash recovery: the previous run may have executed the transfer for the
+	// first remaining entry but crashed before recording it on the tracker.
+	const recoveredTxHash = await findUnrecordedTransfer(
+		remainingEntries[0],
+		ccaEndBlock,
+	);
+	if (recoveredTxHash) {
+		// biome-ignore lint/style/noNonNullAssertion: the if guard above ensures this is not null
+		const entry = remainingEntries.shift()!;
+		await recordOnTracker(entry.to, entry.ccaAmount, recoveredTxHash);
+	}
+
+	const whaleTotal = sumOf(
+		remainingEntries
+			.filter((e) => e.kind === "whale")
+			.map((e) => e.transferAmount),
+	);
+	if (whaleTotal > 0n) await approveWhaleDisburser(whaleTotal);
+
 	for (const entry of remainingEntries) {
-		console.log(
-			`\n  ${entry.label}: ${entry.to} → ${entry.transferTo} | ${formatEther(entry.transferAmount)}`,
-		);
-
-		let txHash: Hex;
-		if (DRY_RUN) {
-			console.log(
-				`    [dry-run] Would transfer ${formatEther(entry.transferAmount)} to ${entry.transferTo}`,
-			);
-			txHash =
-				"0x0000000000000000000000000000000000000000000000000000000000000000";
-		} else {
-			txHash = await disburserClient.writeContract({
-				address: SOLD_TOKEN_ADDRESS,
-				abi: erc20Abi,
-				functionName: "transfer",
-				args: [entry.transferTo, entry.transferAmount],
-			});
-			await publicClient.waitForTransactionReceipt({ hash: txHash });
-			console.log(`    transfer tx: ${txHash}`);
-		}
-
-		const alreadyRecorded = globalEntryIdx < trackerRecordedCount;
-		if (alreadyRecorded) {
-			console.log("    Tracker recording already present (crash recovery).");
-		} else if (DRY_RUN) {
-			console.log(
-				`    [dry-run] Would record: ${entry.to} CCA ${formatEther(entry.ccaAmount)}, txHash ${txHash}, txIndex 0`,
-			);
-		} else {
-			const recordHash = await disburserClient.writeContract({
-				address: TRACKER_ADDRESS,
-				abi: trackerAbi,
-				functionName: "recordDisbursements",
-				args: [[entry.to], [entry.ccaAmount], [txHash], [0n]],
-			});
-			await publicClient.waitForTransactionReceipt({ hash: recordHash });
-			console.log(`    tracker tx: ${recordHash}`);
-		}
-
-		globalEntryIdx++;
+		const txHash = await executeEntry(entry);
+		await recordOnTracker(entry.to, entry.ccaAmount, txHash);
 	}
 }
 
 // ── Final state ─────────────────────────────────────────────────────────────
 
-if (!DRY_RUN) {
-	const fullyDisbursed = await publicClient.readContract({
-		address: TRACKER_ADDRESS,
-		abi: trackerAbi,
-		functionName: "saleFullyDisbursed",
-	});
-	console.log(`\nSale fully disbursed: ${fullyDisbursed}`);
-} else {
-	console.log("\n*** Dry run complete. No transactions were broadcast. ***");
-}
+assertCondition(
+	await trackerContract.read.saleFullyDisbursed(),
+	"Sale is not fully disbursed. This should never happen.",
+);
