@@ -6,7 +6,6 @@ IERC20
 reentrancy
 soldeer
 thesephist
-TOKENOPS
 tqdm
 tsqdm
 unslashed
