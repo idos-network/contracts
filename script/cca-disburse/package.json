@@ -12,7 +12,7 @@
 		"test": "tsx --test src/*.test.ts"
 	},
 	"dependencies": {
-		"@thesephist/tsqdm": "^0.1.1",
+		"@thesephist/tsqdm": "0.1.1",
 		"dotenv": "^16.4.7",
 		"viem": "^2.23.2"
 	},

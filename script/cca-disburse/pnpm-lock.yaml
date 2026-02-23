@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@thesephist/tsqdm':
-        specifier: ^0.1.1
+        specifier: 0.1.1
         version: 0.1.1
       dotenv:
         specifier: ^16.4.7
