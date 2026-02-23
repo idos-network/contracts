@@ -1,4 +1,4 @@
-import type { Hex, PublicClient } from "viem";
+import type { Address, Hex, PublicClient } from "viem";
 
 export function requireEnv(name: string): string {
 	const value = process.env[name];
@@ -81,6 +81,14 @@ export async function blockToTimestamp(
 	blockNumber: bigint,
 ): Promise<bigint> {
 	return (await publicClient.getBlock({ blockNumber })).timestamp;
+}
+
+export async function contractHasCode(
+	publicClient: PublicClient,
+	contract: { address: Address },
+): Promise<boolean> {
+	const code = await publicClient.getCode({ address: contract.address });
+	return !!code && code !== "0x";
 }
 
 function bigintMin(a: bigint, b: bigint): bigint {

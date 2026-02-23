@@ -18,6 +18,7 @@ import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
 import {
 	assertCondition,
 	blockToTimestamp,
+	contractHasCode,
 	ensureHex,
 	iso8601ToTimestamp,
 	paginatedGetEvents,
@@ -101,6 +102,19 @@ const whaleDisburserContract = getContract({
 	abi: whaleDisburserAbi,
 	client: disburserClient,
 });
+
+for (const contract of [
+	ccaContract,
+	trackerContract,
+	soldTokenContract,
+	whaleDisburserContract,
+]) {
+	assertCondition(
+		await contractHasCode(publicClient, contract),
+		`No contract code on address ${contract.address} on chain ${chain.id}.`,
+	);
+}
+console.log(`✅ All contracts addresses have deployed code.`);
 
 interface DisbursementEntry {
 	kind: "normal" | "whale" | "sweep";
