@@ -222,7 +222,7 @@ const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 
 assertCondition(
 	sweepLogs.length > 0,
-	"No TokensSwept event found. Call sweepUnsoldTokens on the CCA contract first.",
+	"No TokensSwept event found. This should never happen, since the tracker should have recorded the sweep.",
 );
 const sweepLog = requiredArgs(sweepLogs[0]);
 const sweep = {
@@ -376,8 +376,8 @@ if (remainingEntries.length > 0) {
 		recoveryFromBlock,
 	);
 	if (recoveredTxHash) {
-		// biome-ignore lint/style/noNonNullAssertion: the if guard above ensures this is not null
-		const entry = remainingEntries.shift()!;
+		const entry = remainingEntries[0];
+		remainingEntries.shift();
 		await recordOnTracker(entry.to, entry.ccaAmount, recoveredTxHash);
 	}
 
