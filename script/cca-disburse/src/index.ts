@@ -242,6 +242,7 @@ assertCondition(
 	sweepLogs.length > 0,
 	"No TokensSwept event found. This should never happen, since the tracker should have recorded the sweep.",
 );
+console.log(`✅ CCA sale has been swept.`);
 const sweepLog = requiredArgs(sweepLogs[0]);
 const sweep = {
 	recipient: sweepLog.tokensRecipient,
@@ -350,6 +351,7 @@ assertCondition(
 	disbursementLogs.length <= expectedEntries.length,
 	`Idempotency broken: found ${disbursementLogs.length} DisbursementCompleted events but only ${expectedEntries.length} entries expected.`,
 );
+console.log(`✅ All disbursement logs have matching expected entries.`);
 
 for (const [i, [expected, log]] of zip(expectedEntries, disbursementLogs).entries()) {
 	const { to, value } = requiredArgs(log);
@@ -411,6 +413,8 @@ if (remainingEntries.length > 0) {
 		const txHash = await executeEntry(entry);
 		await recordOnTracker(entry.to, entry.ccaAmount, txHash);
 	}
+}else {
+	console.log(`✅ No remaining entries to disburse.`);
 }
 
 // ── Final state ─────────────────────────────────────────────────────────────
@@ -419,3 +423,4 @@ assertCondition(
 	DRY_RUN || (await trackerContract.read.saleFullyDisbursed()),
 	"Sale is not fully disbursed. This should never happen.",
 );
+console.log(`✅ Run completed successfully.`);
