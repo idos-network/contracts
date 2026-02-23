@@ -47,11 +47,8 @@ const SOLD_TOKEN_ADDRESS = getAddress(requireEnv("SOLD_TOKEN_ADDRESS"));
 const WHALE_DISBURSER_ADDRESS = getAddress(
 	requireEnv("WHALE_DISBURSER_ADDRESS"),
 );
-const VESTING_START = BigInt(requireEnv("VESTING_START"));
-
-const normalPhaseStartTimestamp = iso8601ToTimestamp(
-	requireEnv("NORMAL_PHASE_START"),
-);
+const VESTING_START = iso8601ToTimestamp(requireEnv("VESTING_START"));
+const NORMAL_PHASE_START = iso8601ToTimestamp(requireEnv("NORMAL_PHASE_START"));
 
 const chain = SUPPORTED_CHAINS[CHAIN_ID];
 assertCondition(
@@ -233,7 +230,7 @@ assertCondition(
 console.log(`✅ CCA sale has ended.`);
 
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
-	normalPhaseStartTimestamp,
+	NORMAL_PHASE_START,
 	ccaStartBlock,
 	ccaEndBlock,
 	async (blockNumber) => blockToTimestamp(publicClient, blockNumber),
