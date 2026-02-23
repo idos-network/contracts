@@ -5,6 +5,7 @@ import {
 	createPublicClient,
 	createWalletClient,
 	formatEther,
+	getAddress,
 	getContract,
 	type Hex,
 	http,
@@ -219,9 +220,9 @@ assertCondition(
 );
 console.log(`✅ CCA sale has been fully claimed.`);
 
-const onChainDisburser = await trackerContract.read.disburser();
+const onChainDisburser = getAddress(await trackerContract.read.disburser());
 assertCondition(
-	onChainDisburser.toLowerCase() === disburser.address.toLowerCase(),
+	onChainDisburser === getAddress(disburser.address),
 	`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
 );
 console.log(`✅ Disburser address matches expected: ${onChainDisburser}`);
@@ -248,7 +249,7 @@ assertCondition(
 console.log(`✅ CCA sale has been swept.`);
 const sweepLog = requiredArgs(sweepLogs[0]);
 const sweep = {
-	recipient: sweepLog.tokensRecipient,
+	recipient: getAddress(sweepLog.tokensRecipient),
 	amount: sweepLog.tokensAmount,
 };
 
@@ -281,7 +282,7 @@ const filledBids = tokensClaims.map((tc) => {
 	const b = bidSubmissionById.get(tc.bidId)!;
 	return {
 		bidId: b.bidId,
-		owner: b.owner,
+		owner: getAddress(b.owner),
 		bidBlockNumber: b.blockNumber,
 		tokensFilled: tc.tokensFilled,
 	};
@@ -295,13 +296,11 @@ const filledBids = tokensClaims.map((tc) => {
 
 const expectedEntries: DisbursementEntry[] = [];
 
-const bidderAddresses = [
-	...new Set(filledBids.map((b) => b.owner.toLowerCase() as Address)),
-].sort();
+const bidderAddresses = [...new Set(filledBids.map((b) => b.owner))].sort();
 
 for (const addr of bidderAddresses) {
 	const [whaleBids, normalBids] = splitBy(
-		filledBids.filter((b) => b.owner.toLowerCase() === addr.toLowerCase()),
+		filledBids.filter((b) => b.owner === addr),
 		(b) => b.bidBlockNumber < phaseBoundaryBlock,
 	);
 
@@ -360,11 +359,9 @@ for (const [i, [expected, log]] of zip(
 	expectedEntries,
 	disbursementLogs,
 ).entries()) {
-	const { to, value } = requiredArgs(log);
-	if (
-		to.toLowerCase() !== expected.to.toLowerCase() ||
-		value !== expected.ccaAmount
-	) {
+	const { to: rawTo, value } = requiredArgs(log);
+	const to = getAddress(rawTo);
+	if (to !== expected.to || value !== expected.ccaAmount) {
 		throw new Error(
 			`Idempotency broken at entry ${i} (${expected.kind}):\n` +
 				`  expected: to=${expected.to}, ccaAmount=${expected.ccaAmount}\n` +
