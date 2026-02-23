@@ -23,6 +23,7 @@ import {
 	requireEnv,
 	splitBy,
 	sumOf,
+	zip,
 } from "./lib";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -350,9 +351,8 @@ assertCondition(
 	`Idempotency broken: found ${disbursementLogs.length} DisbursementCompleted events but only ${expectedEntries.length} entries expected.`,
 );
 
-for (let i = 0; i < disbursementLogs.length; i++) {
-	const expected = expectedEntries[i];
-	const { to, value } = requiredArgs(disbursementLogs[i]);
+for (const [i, [expected, log]] of zip(expectedEntries, disbursementLogs).entries()) {
+	const { to, value } = requiredArgs(log);
 	if (
 		to.toLowerCase() !== expected.to.toLowerCase() ||
 		value !== expected.ccaAmount
