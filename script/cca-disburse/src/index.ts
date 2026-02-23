@@ -20,6 +20,7 @@ import {
 	blockToTimestamp,
 	ensureHex,
 	iso8601ToTimestamp,
+	paginatedGetEvents,
 	requiredArgs,
 	requireEnv,
 	splitBy,
@@ -228,17 +229,20 @@ assertCondition(
 console.log(`✅ Disburser address matches expected: ${onChainDisburser}`);
 
 const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
-	ccaContract.getEvents.BidSubmitted(
-		{},
-		{ fromBlock: ccaStartBlock, toBlock: ccaEndBlock },
+	paginatedGetEvents(
+		(r) => ccaContract.getEvents.BidSubmitted({}, r),
+		ccaStartBlock,
+		ccaEndBlock,
 	),
-	ccaContract.getEvents.TokensClaimed(
-		{},
-		{ fromBlock: ccaStartBlock, toBlock: currentBlock },
+	paginatedGetEvents(
+		(r) => ccaContract.getEvents.TokensClaimed({}, r),
+		ccaEndBlock,
+		currentBlock,
 	),
-	ccaContract.getEvents.TokensSwept(
-		{},
-		{ fromBlock: ccaStartBlock, toBlock: currentBlock },
+	paginatedGetEvents(
+		(r) => ccaContract.getEvents.TokensSwept({}, r),
+		ccaEndBlock,
+		currentBlock,
 	),
 ]);
 
@@ -344,9 +348,10 @@ if (sweep.amount > 0n) {
 // always in that order. If we crash between the two, we detect the unrecorded
 // transfer on the next run and resume from the tracker recording step.
 
-const disbursementLogs = await trackerContract.getEvents.DisbursementCompleted(
-	{},
-	{ fromBlock: ccaEndBlock, toBlock: currentBlock },
+const disbursementLogs = await paginatedGetEvents(
+	(r) => trackerContract.getEvents.DisbursementCompleted({}, r),
+	ccaEndBlock,
+	currentBlock,
 );
 
 assertCondition(

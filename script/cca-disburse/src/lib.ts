@@ -82,3 +82,35 @@ export async function blockToTimestamp(
 ): Promise<bigint> {
 	return (await publicClient.getBlock({ blockNumber })).timestamp;
 }
+
+function bigintMin(a: bigint, b: bigint): bigint {
+	return a < b ? a : b;
+}
+
+const DEFAULT_PAGE_SIZE = 10_000n;
+
+export function blockWindows(
+	fromBlock: bigint,
+	toBlock: bigint,
+	pageSize: bigint = DEFAULT_PAGE_SIZE,
+): { fromBlock: bigint; toBlock: bigint }[] {
+	const windows: { fromBlock: bigint; toBlock: bigint }[] = [];
+	for (let start = fromBlock; start <= toBlock; start += pageSize + 1n) {
+		windows.push({
+			fromBlock: start,
+			toBlock: bigintMin(toBlock, start + pageSize),
+		});
+	}
+	return windows;
+}
+
+export async function paginatedGetEvents<T>(
+	fetcher: (range: { fromBlock: bigint; toBlock: bigint }) => Promise<T[]>,
+	fromBlock: bigint,
+	toBlock: bigint,
+	pageSize: bigint = DEFAULT_PAGE_SIZE,
+): Promise<T[]> {
+	return (
+		await Promise.all(blockWindows(fromBlock, toBlock, pageSize).map(fetcher))
+	).flat();
+}
