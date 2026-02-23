@@ -68,11 +68,13 @@ contract WhaleDisburserTest is Test {
     }
 
     function test_EmitsDisbursedEvent() public {
-        vm.expectEmit(true, false, false, false, address(wd));
-        emit WhaleDisburser.Disbursed(alice, 0, address(0), 0);
+        uint256 total = 400 ether;
+        address expectedWallet = vm.computeCreateAddress(address(wd), vm.getNonce(address(wd)));
 
         vm.prank(caller);
-        wd.disburse(IERC20(address(token)), alice, 400 ether, vestingStart);
+        vm.expectEmit();
+        emit WhaleDisburser.Disbursed(alice, total, total / 6, expectedWallet, total - total / 6);
+        wd.disburse(IERC20(address(token)), alice, total, vestingStart);
     }
 
     function test_RevertsWithoutApproval() public {
