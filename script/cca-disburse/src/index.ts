@@ -193,14 +193,20 @@ assertCondition(
 );
 console.log(`✅ CCA sale has ended.`);
 
+const normalPhaseStartTimestamp = iso8601ToTimestamp(NORMAL_PHASE_START);
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
-	iso8601ToTimestamp(NORMAL_PHASE_START),
+	normalPhaseStartTimestamp,
 	ccaStartBlock,
 	ccaEndBlock,
 	async (blockNumber) => blockToTimestamp(publicClient, blockNumber),
 );
+const phaseBoundaryTimestamp = await blockToTimestamp(publicClient, phaseBoundaryBlock);
+assertCondition(
+	ccaStartBlock <= phaseBoundaryBlock && phaseBoundaryBlock <= ccaEndBlock,
+	`Phase boundary block is out of range: ${phaseBoundaryBlock} is not between ${ccaStartBlock} and ${ccaEndBlock}.`,
+);
 console.log(
-	`✅ Normal phase boundary block found: ${phaseBoundaryBlock}, at ${new Date(Number(await blockToTimestamp(publicClient, phaseBoundaryBlock)) * 1000).toISOString()}`,
+	`✅ Normal phase boundary block found: ${phaseBoundaryBlock}, at ${new Date(Number(phaseBoundaryTimestamp) * 1000).toISOString()}`,
 );
 
 assertCondition(
