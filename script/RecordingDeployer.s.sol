@@ -26,7 +26,7 @@ contract RecordingDeployer is Script, Config {
 
         vm.startBroadcast();
         addr = vm.deployCode(artifactPath, constructorArgs);
-        if (chainId != 31337) config.set(chainId, contractName, addr);
+        if (chainId != 31337 && chainId != 421614) config.set(chainId, contractName, addr);
         vm.stopBroadcast();
 
         console.log("%s deployed on chain %s at %s", contractName, chainId, addr);
