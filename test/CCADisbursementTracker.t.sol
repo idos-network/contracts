@@ -650,10 +650,11 @@ contract CCADisbursementTrackerIntegrationTest is Test {
         // which can leave a small amount of token dust after sweep+claim.
         // The CCA's own tests tolerate up to MAX_ALLOWABLE_DUST_WEI = 1e18
         // (see AuctionBaseTest.sol L53, SweepUnsoldTokens.t.sol L144-148).
-        assertLe(tracker.totalSupply(), MAX_ALLOWABLE_DUST_WEI);
+        uint256 dust = tracker.totalSupply();
+        assertLe(dust, MAX_ALLOWABLE_DUST_WEI);
         assertTrue(tracker.saleFullyClaimed());
 
-        uint256 bid2Tokens = TOKEN_SUPPLY - MAX_ALLOWABLE_DUST_WEI;
+        uint256 bid2Tokens = TOKEN_SUPPLY - dust;
         assertEq(tracker.missingDisbursementTo(bidder1), 0);
         assertEq(tracker.missingDisbursementTo(bidder2), bid2Tokens);
         assertEq(tracker.missingDisbursementTo(tokensRecipient), 0);

@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // @dev As per CCA's own tests, the CCA can leave up to 1e18 wei of dust in the
 //      contract after sweep+claim.
-uint256 constant MAX_ALLOWABLE_DUST_WEI = 1;
+uint256 constant MAX_ALLOWABLE_DUST_WEI = 1e18;
 
 /**
  * @title CCADisbursementTracker
