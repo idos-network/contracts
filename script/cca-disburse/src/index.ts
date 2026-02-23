@@ -364,9 +364,14 @@ if (remainingEntries.length > 0) {
 
 	// Crash recovery: the previous run may have executed the transfer for the
 	// first remaining entry but crashed before recording it on the tracker.
+	// Search from the last recorded event's block to minimize false positives.
+	const recoveryFromBlock =
+		completedCount > 0
+			? disbursementLogs[completedCount - 1].blockNumber
+			: ccaEndBlock;
 	const recoveredTxHash = await findUnrecordedTransfer(
 		remainingEntries[0],
-		ccaEndBlock,
+		recoveryFromBlock,
 	);
 	if (recoveredTxHash) {
 		// biome-ignore lint/style/noNonNullAssertion: the if guard above ensures this is not null
