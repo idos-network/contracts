@@ -201,7 +201,10 @@ const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 	ccaEndBlock,
 	async (blockNumber) => blockToTimestamp(publicClient, blockNumber),
 );
-const phaseBoundaryTimestamp = await blockToTimestamp(publicClient, phaseBoundaryBlock);
+const phaseBoundaryTimestamp = await blockToTimestamp(
+	publicClient,
+	phaseBoundaryBlock,
+);
 assertCondition(
 	ccaStartBlock <= phaseBoundaryBlock && phaseBoundaryBlock <= ccaEndBlock,
 	`Phase boundary block is out of range: ${phaseBoundaryBlock} is not between ${ccaStartBlock} and ${ccaEndBlock}.`,
@@ -353,7 +356,10 @@ assertCondition(
 );
 console.log(`✅ All disbursement logs have matching expected entries.`);
 
-for (const [i, [expected, log]] of zip(expectedEntries, disbursementLogs).entries()) {
+for (const [i, [expected, log]] of zip(
+	expectedEntries,
+	disbursementLogs,
+).entries()) {
 	const { to, value } = requiredArgs(log);
 	if (
 		to.toLowerCase() !== expected.to.toLowerCase() ||
@@ -413,7 +419,7 @@ if (remainingEntries.length > 0) {
 		const txHash = await executeEntry(entry);
 		await recordOnTracker(entry.to, entry.ccaAmount, txHash);
 	}
-}else {
+} else {
 	console.log(`✅ No remaining entries to disburse.`);
 }
 

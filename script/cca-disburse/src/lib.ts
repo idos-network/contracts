@@ -8,7 +8,8 @@ export function requireEnv(name: string): string {
 
 const HEX_PATTERN = /^[0-9a-fA-F]+$/;
 export function ensureHex(value: string): Hex {
-	const raw = value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+	const raw =
+		value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
 	if (!HEX_PATTERN.test(raw)) {
 		throw new Error(`Invalid hex string: "${value}"`);
 	}
@@ -59,7 +60,10 @@ export function sumOf(values: bigint[]): bigint {
 	return values.reduce((a, b) => a + b, 0n);
 }
 
-export function assertCondition(condition: boolean, message: string): asserts condition {
+export function assertCondition(
+	condition: boolean,
+	message: string,
+): asserts condition {
 	if (!condition) throw new Error(message);
 }
 
