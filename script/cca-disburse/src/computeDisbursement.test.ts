@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import { computeDisbursement } from "./computeDisbursement.js";
 
 const e18 = 10n ** 18n;
@@ -102,10 +102,7 @@ describe("computeDisbursement", () => {
         assert.equal(r.ccaWhale, whale);
         assert.equal(r.ccaNormal, normal);
 
-        assert.ok(
-          r.disbursableWhale >= r.ccaWhale,
-          "disbursable whale must be >= CCA whale",
-        );
+        assert.ok(r.disbursableWhale >= r.ccaWhale, "disbursable whale must be >= CCA whale");
 
         assert.equal(r.disbursableNormal, normal);
       });

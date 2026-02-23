@@ -17,10 +17,7 @@ export interface BidderDisbursement {
  * tracker record amounts. The 1/6 immediate + 5/6 vested split is handled
  * on-chain by the WhaleDisburser contract.
  */
-export function computeDisbursement(
-  ccaWhale: bigint,
-  ccaNormal: bigint,
-): BidderDisbursement {
+export function computeDisbursement(ccaWhale: bigint, ccaNormal: bigint): BidderDisbursement {
   const bonusMultiplier = BPS_BASE + WHALE_BONUS_BPS;
 
   return {
