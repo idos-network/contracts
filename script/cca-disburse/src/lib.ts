@@ -112,13 +112,20 @@ export function blockWindows(
 	return windows;
 }
 
+const DEFAULT_CONCURRENCY = 5;
+
 export async function paginatedGetEvents<T>(
 	fetcher: (range: { fromBlock: bigint; toBlock: bigint }) => Promise<T[]>,
 	fromBlock: bigint,
 	toBlock: bigint,
 	pageSize: bigint = DEFAULT_PAGE_SIZE,
 ): Promise<T[]> {
-	return (
-		await Promise.all(blockWindows(fromBlock, toBlock, pageSize).map(fetcher))
-	).flat();
+	const windows = blockWindows(fromBlock, toBlock, pageSize);
+	const results: T[] = [];
+	for (let i = 0; i < windows.length; i += DEFAULT_CONCURRENCY) {
+		const batch = windows.slice(i, i + DEFAULT_CONCURRENCY);
+		const pages = await Promise.all(batch.map(fetcher));
+		results.push(...pages.flat());
+	}
+	return results;
 }
