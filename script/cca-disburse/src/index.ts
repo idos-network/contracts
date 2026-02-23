@@ -390,6 +390,6 @@ if (remainingEntries.length > 0) {
 // ── Final state ─────────────────────────────────────────────────────────────
 
 assertCondition(
-	await trackerContract.read.saleFullyDisbursed(),
+	DRY_RUN || await trackerContract.read.saleFullyDisbursed(),
 	"Sale is not fully disbursed. This should never happen.",
 );
