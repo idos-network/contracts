@@ -259,8 +259,8 @@ contract CCADisbursementTracker is ERC20 {
 
         unchecked {
             _missingDisbursements[to] -= value;
+            _totalMissingDisbursements -= value;
         }
-        _totalMissingDisbursements -= value;
         _disbursements[to].push(Disbursement({value: value, txHash: txHash}));
 
         emit DisbursementCompleted(to, value, txHash);
