@@ -29,7 +29,7 @@ if (DRY_RUN)
 
 const RPC_URL = requireEnv("RPC_URL");
 const DISBURSER_PRIVATE_KEY = requireEnv("DISBURSER_PRIVATE_KEY");
-const TRACKER_ADDRESS = requireEnv("TRACKER_ADDRESS") as Address;
+const TRACKER_TOKEN_ADDRESS = requireEnv("TRACKER_TOKEN_ADDRESS") as Address;
 const CCA_ADDRESS = requireEnv("CCA_ADDRESS") as Address;
 const SOLD_TOKEN_ADDRESS = requireEnv("SOLD_TOKEN_ADDRESS") as Address;
 const WHALE_DISBURSER_ADDRESS = requireEnv(
@@ -58,7 +58,7 @@ const ccaContract = getContract({
 });
 
 const trackerContract = getContract({
-	address: TRACKER_ADDRESS,
+	address: TRACKER_TOKEN_ADDRESS,
 	abi: trackerAbi,
 	client: disburserClient,
 });
@@ -194,6 +194,17 @@ const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 		(await publicClient.getBlock({ blockNumber })).timestamp,
 );
 
+assertCondition(
+	await trackerContract.read.saleFullyClaimed(),
+	"Sale is not fully claimed yet. Wait for all claimTokens and sweepUnsoldTokens to be called.",
+);
+
+const onChainDisburser = await trackerContract.read.disburser();
+assertCondition(
+	onChainDisburser.toLowerCase() === disburser.address.toLowerCase(),
+	`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
+);
+
 const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 	ccaContract.getEvents.BidSubmitted(
 		{},
@@ -209,38 +220,6 @@ const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 	),
 ]);
 
-const bidSubmissions = bidLogs.map((l) => {
-	const { id: bidId, owner } = requiredArgs(l);
-	return { bidId, owner, blockNumber: l.blockNumber };
-});
-
-// TokensClaimed is the only event that matters for token amounts. BidExited
-// records the same tokensFilled value earlier (during exit), but the actual
-// token transfer (and thus the tracker's MissingDisbursementRecorded) only
-// happens at claim time.
-const tokensClaims = claimLogs.map((l) => requiredArgs(l));
-
-const bidSubmissionsIds = new Set(bidSubmissions.map((b) => b.bidId));
-const tokensClaimBidIds = new Set(tokensClaims.map((o) => o.bidId));
-const symDiff = bidSubmissionsIds.symmetricDifference(tokensClaimBidIds);
-if (symDiff.size > 0) {
-	throw new Error(
-		`Bid IDs between BidSubmitted and TokensClaimed are not the same: ${Array.from(symDiff).join(", ")}`,
-	);
-}
-
-const bidSubmissionById = new Map(bidSubmissions.map((o) => [o.bidId, o]));
-const filledBids = tokensClaims.map((tc) => {
-	// biome-ignore lint/style/noNonNullAssertion: We've checked symDiff above.
-	const b = bidSubmissionById.get(tc.bidId)!;
-	return {
-		bidId: b.bidId,
-		owner: b.owner,
-		bidBlockNumber: b.blockNumber,
-		tokensFilled: tc.tokensFilled,
-	};
-});
-
 assertCondition(
 	sweepLogs.length > 0,
 	"No TokensSwept event found. Call sweepUnsoldTokens on the CCA contract first.",
@@ -251,16 +230,39 @@ const sweep = {
 	amount: sweepLog.tokensAmount,
 };
 
+const bidSubmissions = bidLogs.map((l) => {
+	const { id: bidId, owner } = requiredArgs(l);
+	return { bidId, owner, blockNumber: l.blockNumber };
+});
+
+// TokensClaimed is the only event that matters for token amounts. BidExited
+// records the same tokensFilled value earlier (during exit), but the actual
+// token transfer (and thus the tracker's MissingDisbursementRecorded) only
+// happens at claim time. Outbid bids may have tokensFilled = 0; we ignore those.
+const tokensClaims = claimLogs
+	.map((l) => requiredArgs(l))
+	.filter((tc) => tc.tokensFilled > 0n);
+
+const bidSubmissionById = new Map(bidSubmissions.map((o) => [o.bidId, o]));
+
+const claimsWithoutSubmission = tokensClaims.filter(
+	(tc) => !bidSubmissionById.has(tc.bidId),
+);
 assertCondition(
-	await trackerContract.read.saleFullyClaimed(),
-	"Sale is not fully claimed yet. Wait for all claimTokens and sweepUnsoldTokens to be called.",
+	!claimsWithoutSubmission.length,
+	`TokensClaimed events without matching BidSubmitted: ${claimsWithoutSubmission.map((tc) => tc.bidId).join(", ")}`,
 );
 
-const onChainDisburser = await trackerContract.read.disburser();
-assertCondition(
-	onChainDisburser.toLowerCase() === disburser.address.toLowerCase(),
-	`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
-);
+const filledBids = tokensClaims.map((tc) => {
+	// biome-ignore lint/style/noNonNullAssertion: asserted above that all claims have a submission.
+	const b = bidSubmissionById.get(tc.bidId)!;
+	return {
+		bidId: b.bidId,
+		owner: b.owner,
+		bidBlockNumber: b.blockNumber,
+		tokensFilled: tc.tokensFilled,
+	};
+});
 
 // ── 2. Compute the full expected entry list ─────────────────────────────────
 //
