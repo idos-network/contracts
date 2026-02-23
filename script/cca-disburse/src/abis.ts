@@ -1,14 +1,6 @@
 export const trackerAbi = [
 	{
 		type: "event",
-		name: "MissingDisbursementRecorded",
-		inputs: [
-			{ name: "to", type: "address", indexed: true },
-			{ name: "value", type: "uint256", indexed: false },
-		],
-	},
-	{
-		type: "event",
 		name: "DisbursementCompleted",
 		inputs: [
 			{ name: "to", type: "address", indexed: true },

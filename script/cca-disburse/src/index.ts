@@ -1,3 +1,4 @@
+import { tqdm } from "@thesephist/tsqdm";
 import "dotenv/config";
 import {
 	type Address,
@@ -185,6 +186,7 @@ assertCondition(
 	currentBlock >= ccaEndBlock,
 	`CCA end block is in the future. We're at block ${currentBlock} and need to wait for block ${ccaEndBlock} to be mined.`,
 );
+console.log(`✅ CCA sale has ended.`)
 
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 	iso8601ToTimestamp(NORMAL_PHASE_START),
@@ -193,17 +195,20 @@ const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 	async (blockNumber) =>
 		(await publicClient.getBlock({ blockNumber })).timestamp,
 );
+console.log(`✅ Normal phase boundary block found: ${phaseBoundaryBlock}, at ${new Date(Number(phaseBoundaryBlock) * 1000).toISOString()}`);
 
 assertCondition(
 	await trackerContract.read.saleFullyClaimed(),
 	"Sale is not fully claimed yet. Wait for all claimTokens and sweepUnsoldTokens to be called.",
 );
+console.log(`✅ CCA sale has been fully claimed.`)
 
 const onChainDisburser = await trackerContract.read.disburser();
 assertCondition(
 	onChainDisburser.toLowerCase() === disburser.address.toLowerCase(),
 	`${disburser.address} is not the disburser (expected ${onChainDisburser}).`,
 );
+console.log(`✅ Disburser address matches expected: ${onChainDisburser}`);
 
 const [bidLogs, claimLogs, sweepLogs] = await Promise.all([
 	ccaContract.getEvents.BidSubmitted(
@@ -252,6 +257,7 @@ assertCondition(
 	!claimsWithoutSubmission.length,
 	`TokensClaimed events without matching BidSubmitted: ${claimsWithoutSubmission.map((tc) => tc.bidId).join(", ")}`,
 );
+console.log(`✅ All tokens claims have matching bid submissions.`)
 
 const filledBids = tokensClaims.map((tc) => {
 	// biome-ignore lint/style/noNonNullAssertion: asserted above that all claims have a submission.
@@ -388,7 +394,7 @@ if (remainingEntries.length > 0) {
 	);
 	if (whaleTotal > 0n) await approveWhaleDisburser(whaleTotal);
 
-	for (const entry of remainingEntries) {
+	for await (const entry of tqdm(remainingEntries, { label: "Disbursing" })) {
 		const txHash = await executeEntry(entry);
 		await recordOnTracker(entry.to, entry.ccaAmount, txHash);
 	}

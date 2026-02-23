@@ -50,7 +50,6 @@ export function sumOf(values: bigint[]): bigint {
 	return values.reduce((a, b) => a + b, 0n);
 }
 
-
 export function assertCondition(condition: boolean, message: string): void {
 	if (!condition) throw new Error(message);
 }
