@@ -9,6 +9,11 @@ fs_permissions = [
 ]
 libs = ["dependencies", "lib"]
 
+[profile.default.invariant]
+fail_on_revert = true
+runs = 100
+depth = 1000
+
 [lint]
 ignore = [
     # Didn't touch these files to avoid drifting away from the audited version.
