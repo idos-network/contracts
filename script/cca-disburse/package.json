@@ -1,0 +1,30 @@
+{
+	"name": "cca-disburse",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"run": "tsx src/index.ts",
+		"dry-run": "tsx src/index.ts --dry-run",
+		"test": "tsx --test src/*.test.ts",
+		"lint": "biome lint src",
+		"format": "biome format --write src",
+		"check": "biome check src",
+		"check:fix": "biome check --write src"
+	},
+	"dependencies": {
+		"@thesephist/tsqdm": "0.1.1",
+		"dotenv": "^16.4.7",
+		"viem": "^2.23.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.4",
+		"@types/node": "^24.0.0",
+		"tsx": "^4.19.2",
+		"typescript": "^5.7.3"
+	},
+	"packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
+}

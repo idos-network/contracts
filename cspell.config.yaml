@@ -11,6 +11,7 @@ dictionaryDefinitions:
     addWords: true
 ignorePaths:
   - "cspell.config.yaml"
+  - "pnpm-*.yaml"
   - "**/.gitignore"
   - "out/**"
   - "lib/**"
