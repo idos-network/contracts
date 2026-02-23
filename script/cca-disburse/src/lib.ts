@@ -40,14 +40,15 @@ export function splitBy<T>(
 	return [yes, no];
 }
 
+const ISO8601_ZULU = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
 export function iso8601ToTimestamp(iso: string): bigint {
-	const ms = new Date(iso).getTime();
-	if (Number.isNaN(ms)) {
+	if (!ISO8601_ZULU.test(iso)) {
 		throw new Error(
-			`Invalid ISO 8601 timestamp: "${iso}". Use format like "2025-03-15T12:00:00Z".`,
+			`Invalid ISO 8601 timestamp: "${iso}". Use format "YYYY-MM-DDTHH:mm:ssZ" (Zulu time zone required).`,
 		);
 	}
-	return BigInt(Math.floor(ms / 1000));
+	return BigInt(Math.floor(new Date(iso).getTime() / 1000));
 }
 
 export function sumOf(values: bigint[]): bigint {
