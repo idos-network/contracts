@@ -19,8 +19,8 @@ importers:
         version: 2.46.2(typescript@5.9.3)
     devDependencies:
       '@types/node':
-        specifier: ^25.3.0
-        version: 25.3.0
+        specifier: ^24.0.0
+        version: 24.10.13
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
@@ -213,8 +213,8 @@ packages:
   '@thesephist/tsqdm@0.1.1':
     resolution: {integrity: sha512-nCGURUO5etEx+2W5A3kD6RqNY4RfwFbGMem16p9wsVkORHHuO6QOGqHJ7l+K5tL/F0XTjq7xsbiawZi2D7G8TA==}
 
-  '@types/node@25.3.0':
-    resolution: {integrity: sha512-4K3bqJpXpqfg2XKGK9bpDTc6xO/xoUP/RBWS7AtRMug6zZFaRekiLzjVtAoZMquxoAbzBvy5nxQ7veS5eYzf8A==}
+  '@types/node@24.10.13':
+    resolution: {integrity: sha512-oH72nZRfDv9lADUBSo104Aq7gPHpQZc4BTx38r9xf9pg5LfP6EzSyH2n7qFmmxRQXh7YlUXODcYsg6PuTDSxGg==}
 
   abitype@1.2.3:
     resolution: {integrity: sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==}
@@ -273,8 +273,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  undici-types@7.18.2:
-    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+  undici-types@7.16.0:
+    resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
   viem@2.46.2:
     resolution: {integrity: sha512-w8Qv5Vyo7TfXcH3vgmxRa1NRvzJCDy2aSGSRsJn3503nC/qVbgEQ+n3aj/CkqWXbloudZh97h5o5aQrQSVGy0w==}
@@ -401,9 +401,9 @@ snapshots:
 
   '@thesephist/tsqdm@0.1.1': {}
 
-  '@types/node@25.3.0':
+  '@types/node@24.10.13':
     dependencies:
-      undici-types: 7.18.2
+      undici-types: 7.16.0
 
   abitype@1.2.3(typescript@5.9.3):
     optionalDependencies:
@@ -479,7 +479,7 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  undici-types@7.18.2: {}
+  undici-types@7.16.0: {}
 
   viem@2.46.2(typescript@5.9.3):
     dependencies:
