@@ -22,7 +22,6 @@ contract WhaleDisburserTest is Test {
 
     address caller;
     address alice;
-    address bob;
 
     uint64 vestingStart;
 
@@ -32,7 +31,6 @@ contract WhaleDisburserTest is Test {
 
         caller = makeAddr("caller");
         alice = makeAddr("alice");
-        bob = makeAddr("bob");
 
         vestingStart = uint64(block.timestamp + 1 days);
 
