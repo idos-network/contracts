@@ -1,13 +1,18 @@
-name: CI
+name: Invariant tests
 
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
+    paths:
+      - "src/**"
+      - "test/**"
+      - "foundry.toml"
+      - "soldeer.lock"
+      - ".foundry-version"
+      - ".github/workflows/invariant.yml"
 
 jobs:
-  forge:
+  forge-invariant:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,29 +37,4 @@ jobs:
 
       - run: forge soldeer install
 
-      - run: forge build
-
-      - run: forge test --no-match-path '*.invariant.*'
-
-  cca-disburse:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: script/cca-disburse
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: script/cca-disburse/package.json
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: pnpm
-          cache-dependency-path: script/cca-disburse/pnpm-lock.yaml
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm test
+      - run: forge test --match-path '*.invariant.*'
