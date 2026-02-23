@@ -421,17 +421,6 @@ console.log(
 const remainingEntries = expectedEntries.slice(disbursementLogs.length);
 
 if (remainingEntries.length > 0) {
-	const remainingTokenTotal = sumOf(
-		remainingEntries.map((e) => e.transferAmount),
-	);
-	const disburserBalance = await soldTokenContract.read.balanceOf([
-		disburser.address,
-	]);
-	assertCondition(
-		disburserBalance >= remainingTokenTotal,
-		`Insufficient token balance. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
-	);
-
 	// Crash recovery: the previous run may have executed the transfer for the
 	// first remaining entry but crashed before recording it on the tracker.
 	// Search from the last recorded event's block to minimize false positives.
@@ -449,6 +438,17 @@ if (remainingEntries.length > 0) {
 		remainingEntries.shift();
 		await recordOnTracker(entry.to, entry.ccaAmount, recoveredTxHash);
 	}
+
+	const remainingTokenTotal = sumOf(
+		remainingEntries.map((e) => e.transferAmount),
+	);
+	const disburserBalance = await soldTokenContract.read.balanceOf([
+		disburser.address,
+	]);
+	assertCondition(
+		disburserBalance >= remainingTokenTotal,
+		`Insufficient token balance. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
+	);
 
 	const whaleTotal = sumOf(
 		remainingEntries
