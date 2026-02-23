@@ -33,17 +33,20 @@ if (DRY_RUN)
 	console.log("[dry-run] Dry run enabled. No transactions will be broadcast.");
 
 const RPC_URL = requireEnv("RPC_URL");
-const DISBURSER_PRIVATE_KEY = requireEnv("DISBURSER_PRIVATE_KEY");
-const TRACKER_TOKEN_ADDRESS = requireEnv("TRACKER_TOKEN_ADDRESS") as Address;
-const CCA_ADDRESS = requireEnv("CCA_ADDRESS") as Address;
-const SOLD_TOKEN_ADDRESS = requireEnv("SOLD_TOKEN_ADDRESS") as Address;
-const WHALE_DISBURSER_ADDRESS = requireEnv(
-	"WHALE_DISBURSER_ADDRESS",
-) as Address;
-const NORMAL_PHASE_START = requireEnv("NORMAL_PHASE_START");
+const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+const TRACKER_TOKEN_ADDRESS = getAddress(requireEnv("TRACKER_TOKEN_ADDRESS"));
+const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
+const SOLD_TOKEN_ADDRESS = getAddress(requireEnv("SOLD_TOKEN_ADDRESS"));
+const WHALE_DISBURSER_ADDRESS = getAddress(
+	requireEnv("WHALE_DISBURSER_ADDRESS"),
+);
 const VESTING_START = BigInt(requireEnv("VESTING_START"));
 
-const disburser = privateKeyToAccount(ensureHex(DISBURSER_PRIVATE_KEY));
+const normalPhaseStartTimestamp = iso8601ToTimestamp(
+	requireEnv("NORMAL_PHASE_START"),
+);
+
+const disburser = privateKeyToAccount(DISBURSER_PRIVATE_KEY);
 
 const publicClient = createPublicClient({
 	chain: arbitrumSepolia,
@@ -196,7 +199,6 @@ assertCondition(
 );
 console.log(`✅ CCA sale has ended.`);
 
-const normalPhaseStartTimestamp = iso8601ToTimestamp(NORMAL_PHASE_START);
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 	normalPhaseStartTimestamp,
 	ccaStartBlock,
