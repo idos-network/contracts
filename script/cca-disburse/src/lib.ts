@@ -6,9 +6,13 @@ export function requireEnv(name: string): string {
 	return value;
 }
 
+const HEX_PATTERN = /^[0-9a-fA-F]+$/;
 export function ensureHex(value: string): Hex {
-	if (value.startsWith("0x")) return value as Hex;
-	return `0x${value}` as Hex;
+	const raw = value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+	if (!HEX_PATTERN.test(raw)) {
+		throw new Error(`Invalid hex string: "${value}"`);
+	}
+	return `0x${raw}` as Hex;
 }
 
 type Defined<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
