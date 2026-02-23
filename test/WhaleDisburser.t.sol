@@ -132,15 +132,20 @@ contract WhaleDisburserTest is Test {
         address wallet = wd.disburse(IERC20(address(token)), alice, total, vestingStart);
 
         IDOSVesting v = IDOSVesting(payable(wallet));
-        uint256 vestedAmount = total - total / 6;
+        uint256 immediateAmount = total / 6;
+        uint256 vestedAmount = total - immediateAmount;
+
+        // Before vesting start: nothing releasable.
+        vm.warp(vestingStart - 1);
+        assertEq(v.releasable(address(token)), 0);
 
         // Before cliff: nothing releasable.
         vm.warp(vestingStart + 30 days - 1);
         assertEq(v.releasable(address(token)), 0);
 
-        // At cliff: proportional amount unlocked.
+        // At cliff: exactly 30/150 of vested amount unlocked.
         vm.warp(vestingStart + 30 days);
-        assertGt(v.releasable(address(token)), 0);
+        assertEq(v.releasable(address(token)), vestedAmount / 5);
 
         // Halfway through vesting (75 days).
         vm.warp(vestingStart + 75 days);
@@ -149,5 +154,11 @@ contract WhaleDisburserTest is Test {
         // Full duration: everything releasable.
         vm.warp(vestingStart + 150 days);
         assertEq(v.releasable(address(token)), vestedAmount);
+
+        // Actually release and verify alice receives the tokens.
+        uint256 aliceBalanceBefore = token.balanceOf(alice);
+        v.release(address(token));
+        assertEq(token.balanceOf(alice), aliceBalanceBefore + vestedAmount);
+        assertEq(token.balanceOf(wallet), 0);
     }
 }
