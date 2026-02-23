@@ -250,8 +250,8 @@ contract CCADisbursementTracker is ERC20 {
     /// @param value Amount disbursed
     /// @param txHash Transaction hash where the on-chain disbursement occurred
     function recordDisbursement(address to, uint256 value, bytes32 txHash) external {
-        if (!saleFullyClaimed()) revert SaleNotFullyClaimed();
         if (msg.sender != _DISBURSER) revert OnlyDisburserCanRecordDisbursements();
+        if (!saleFullyClaimed()) revert SaleNotFullyClaimed();
         if (to == address(0)) revert NoZeroAddressRecipientAllowed();
         if (value == 0) revert NoZeroDisbursementsAllowed();
         if (_missingDisbursements[to] < value) revert OverdisbursementDetected();
