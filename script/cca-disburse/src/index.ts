@@ -11,7 +11,7 @@ import {
 	http,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrumSepolia } from "viem/chains";
+import { arbitrum, arbitrumSepolia } from "viem/chains";
 import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis";
 import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
@@ -32,6 +32,12 @@ const DRY_RUN = process.argv.includes("--dry-run");
 if (DRY_RUN)
 	console.log("[dry-run] Dry run enabled. No transactions will be broadcast.");
 
+const SUPPORTED_CHAINS = {
+	[String(arbitrumSepolia.id)]: arbitrumSepolia,
+	[String(arbitrum.id)]: arbitrum,
+} as const;
+
+const CHAIN_ID = requireEnv("CHAIN_ID");
 const RPC_URL = requireEnv("RPC_URL");
 const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
 const TRACKER_TOKEN_ADDRESS = getAddress(requireEnv("TRACKER_TOKEN_ADDRESS"));
@@ -46,15 +52,28 @@ const normalPhaseStartTimestamp = iso8601ToTimestamp(
 	requireEnv("NORMAL_PHASE_START"),
 );
 
-const disburser = privateKeyToAccount(DISBURSER_PRIVATE_KEY);
+const chain = SUPPORTED_CHAINS[CHAIN_ID];
+assertCondition(
+	chain !== undefined,
+	`Unsupported CHAIN_ID: ${CHAIN_ID}. Supported: ${Object.keys(SUPPORTED_CHAINS).join(", ")}`,
+);
 
 const publicClient = createPublicClient({
-	chain: arbitrumSepolia,
+	chain,
 	transport: http(RPC_URL),
 });
 
+const rpcChainId = await publicClient.getChainId();
+assertCondition(
+	rpcChainId === chain.id,
+	`RPC_URL points to chain ${rpcChainId}, expected ${chain.id} (${chain.name}).`,
+);
+console.log(`✅ RPC connected to ${chain.name} (chain ${rpcChainId}).`);
+
+const disburser = privateKeyToAccount(DISBURSER_PRIVATE_KEY);
+
 const disburserClient = createWalletClient({
-	chain: arbitrumSepolia,
+	chain,
 	transport: http(RPC_URL),
 	account: disburser,
 });
