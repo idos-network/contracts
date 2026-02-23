@@ -12,6 +12,9 @@ contract WhaleDisburser {
     uint64 public constant VESTING_DURATION = 150 days;
     uint64 public constant VESTING_CLIFF = 30 days;
 
+    error TotalAmountIsZero();
+    error ZeroAddressBeneficiary();
+
     event Disbursed(
         address indexed beneficiary,
         uint256 totalAmount,
@@ -26,6 +29,9 @@ contract WhaleDisburser {
         uint256 totalAmount,
         uint64 vestingStart
     ) external returns (address) {
+        if (totalAmount == 0) revert TotalAmountIsZero();
+        if (beneficiary == address(0)) revert ZeroAddressBeneficiary();
+
         uint256 immediateAmount = totalAmount / 6;
         if (immediateAmount > 0) {
             token.safeTransferFrom(msg.sender, beneficiary, immediateAmount);
