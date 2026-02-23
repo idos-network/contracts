@@ -16,6 +16,7 @@ import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
 import {
 	assertCondition,
+	blockToTimestamp,
 	ensureHex,
 	iso8601ToTimestamp,
 	requiredArgs,
@@ -114,7 +115,10 @@ async function approveWhaleDisburser(amount: bigint): Promise<void> {
 		console.log(`[dry-run] approve WhaleDisburser for ${formatEther(amount)}`);
 		return;
 	}
-	const hash = await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]);
+	const hash = await soldTokenContract.write.approve([
+		WHALE_DISBURSER_ADDRESS,
+		amount,
+	]);
 	await publicClient.waitForTransactionReceipt({ hash });
 }
 
@@ -148,13 +152,14 @@ async function recordOnTracker(
 async function findUnrecordedTransfer(
 	entry: DisbursementEntry,
 	fromBlock: bigint,
+	toBlock: bigint,
 ): Promise<Hex | null> {
 	if (DRY_RUN) return null;
 
 	if (entry.kind === "whale") {
 		const logs = await whaleDisburserContract.getEvents.Disbursed(
 			{ beneficiary: entry.to },
-			{ fromBlock, toBlock: "latest" },
+			{ fromBlock, toBlock },
 		);
 		const match = logs.find((l) => l.args.totalAmount === entry.transferAmount);
 		if (!match) return null;
@@ -162,7 +167,7 @@ async function findUnrecordedTransfer(
 	} else {
 		const logs = await soldTokenContract.getEvents.Transfer(
 			{ from: disburser.address, to: entry.to },
-			{ fromBlock, toBlock: "latest" },
+			{ fromBlock, toBlock },
 		);
 		const match = logs.find((l) => l.args.value === entry.transferAmount);
 		if (!match) return null;
@@ -186,22 +191,23 @@ assertCondition(
 	currentBlock >= ccaEndBlock,
 	`CCA end block is in the future. We're at block ${currentBlock} and need to wait for block ${ccaEndBlock} to be mined.`,
 );
-console.log(`✅ CCA sale has ended.`)
+console.log(`✅ CCA sale has ended.`);
 
 const phaseBoundaryBlock = await findFirstBlockAtOrAfter(
 	iso8601ToTimestamp(NORMAL_PHASE_START),
 	ccaStartBlock,
 	ccaEndBlock,
-	async (blockNumber) =>
-		(await publicClient.getBlock({ blockNumber })).timestamp,
+	async (blockNumber) => blockToTimestamp(publicClient, blockNumber),
 );
-console.log(`✅ Normal phase boundary block found: ${phaseBoundaryBlock}, at ${new Date(Number(phaseBoundaryBlock) * 1000).toISOString()}`);
+console.log(
+	`✅ Normal phase boundary block found: ${phaseBoundaryBlock}, at ${new Date(Number(await blockToTimestamp(publicClient, phaseBoundaryBlock)) * 1000).toISOString()}`,
+);
 
 assertCondition(
 	await trackerContract.read.saleFullyClaimed(),
 	"Sale is not fully claimed yet. Wait for all claimTokens and sweepUnsoldTokens to be called.",
 );
-console.log(`✅ CCA sale has been fully claimed.`)
+console.log(`✅ CCA sale has been fully claimed.`);
 
 const onChainDisburser = await trackerContract.read.disburser();
 assertCondition(
@@ -257,7 +263,7 @@ assertCondition(
 	!claimsWithoutSubmission.length,
 	`TokensClaimed events without matching BidSubmitted: ${claimsWithoutSubmission.map((tc) => tc.bidId).join(", ")}`,
 );
-console.log(`✅ All tokens claims have matching bid submissions.`)
+console.log(`✅ All tokens claims have matching bid submissions.`);
 
 const filledBids = tokensClaims.map((tc) => {
 	// biome-ignore lint/style/noNonNullAssertion: asserted above that all claims have a submission.
@@ -380,6 +386,7 @@ if (remainingEntries.length > 0) {
 	const recoveredTxHash = await findUnrecordedTransfer(
 		remainingEntries[0],
 		recoveryFromBlock,
+		currentBlock,
 	);
 	if (recoveredTxHash) {
 		const entry = remainingEntries[0];
@@ -403,6 +410,6 @@ if (remainingEntries.length > 0) {
 // ── Final state ─────────────────────────────────────────────────────────────
 
 assertCondition(
-	DRY_RUN || await trackerContract.read.saleFullyDisbursed(),
+	DRY_RUN || (await trackerContract.read.saleFullyDisbursed()),
 	"Sale is not fully disbursed. This should never happen.",
 );

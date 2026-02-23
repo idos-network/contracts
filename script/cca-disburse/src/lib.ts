@@ -1,4 +1,4 @@
-import type { Hex } from "viem";
+import type { Hex, PublicClient } from "viem";
 
 export function requireEnv(name: string): string {
 	const value = process.env[name];
@@ -9,13 +9,14 @@ export function requireEnv(name: string): string {
 export function ensureHex(value: string): Hex {
 	if (value.startsWith("0x")) return value as Hex;
 	return `0x${value}` as Hex;
-};
+}
 
 type Defined<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
 
-export function requiredArgs<T extends Record<string, unknown>>(
-	log: { args: T; eventName?: string },
-): Defined<T> {
+export function requiredArgs<T extends Record<string, unknown>>(log: {
+	args: T;
+	eventName?: string;
+}): Defined<T> {
 	const out = {} as Record<string, unknown>;
 	for (const [key, value] of Object.entries(log.args)) {
 		if (value === undefined)
@@ -27,7 +28,10 @@ export function requiredArgs<T extends Record<string, unknown>>(
 	return out as Defined<T>;
 }
 
-export function splitBy<T>(items: T[], predicate: (item: T) => boolean): [T[], T[]] {
+export function splitBy<T>(
+	items: T[],
+	predicate: (item: T) => boolean,
+): [T[], T[]] {
 	const yes: T[] = [];
 	const no: T[] = [];
 	for (const item of items) {
@@ -52,4 +56,11 @@ export function sumOf(values: bigint[]): bigint {
 
 export function assertCondition(condition: boolean, message: string): void {
 	if (!condition) throw new Error(message);
+}
+
+export async function blockToTimestamp(
+	publicClient: PublicClient,
+	blockNumber: bigint,
+): Promise<bigint> {
+	return (await publicClient.getBlock({ blockNumber })).timestamp;
 }
