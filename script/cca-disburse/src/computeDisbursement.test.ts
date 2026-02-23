@@ -47,10 +47,6 @@ describe("computeDisbursement", () => {
     it("applies 20% bonus", () => {
       assert.equal(r.disbursableWhale, 1200n * e18);
     });
-
-    it("actual tokens are 120% of CCA amount", () => {
-      assert.equal(r.disbursableWhale, 1200n * e18);
-    });
   });
 
   describe("normal only (500 tokens)", () => {
