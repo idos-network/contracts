@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IDOSVesting} from "../src/IDOSVesting.sol";
 import {WhaleDisburser} from "../src/WhaleDisburser.sol";
@@ -81,9 +82,12 @@ contract WhaleDisburserTest is Test {
         address noApproval = makeAddr("noApproval");
         token.mint(noApproval, 1000 ether);
 
+        uint256 total = 400 ether;
         vm.prank(noApproval);
-        vm.expectRevert();
-        wd.disburse(IERC20(address(token)), alice, 400 ether, vestingStart);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(wd), 0, total / 6)
+        );
+        wd.disburse(IERC20(address(token)), alice, total, vestingStart);
     }
 
     function test_TwoCallsForSameBeneficiaryCreateSeparateWallets() public {
