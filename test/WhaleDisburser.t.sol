@@ -102,6 +102,18 @@ contract WhaleDisburserTest is Test {
         assertEq(token.balanceOf(alice), total1 / 6 + total2 / 6);
     }
 
+    function test_SplitWithTotalAmountZero() public {
+        uint256 aliceBefore = token.balanceOf(alice);
+
+        vm.prank(caller);
+        vm.expectEmit();
+        emit WhaleDisburser.Disbursed(alice, 0, 0, address(0), 0);
+        address wallet = wd.disburse(IERC20(address(token)), alice, 0, vestingStart);
+
+        assertEq(wallet, address(0));
+        assertEq(token.balanceOf(alice), aliceBefore);
+    }
+
     function test_SplitWithTotalAmountOne() public {
         vm.prank(caller);
         address wallet = wd.disburse(IERC20(address(token)), alice, 1, vestingStart);
