@@ -10,6 +10,7 @@
 /broadcast/*/31337
 # Rely on the timestamped json files instead.
 /broadcast/*/*/run-latest.json
+/broadcast/*/*/dry-run
 
 # pnpm deploy output
 /bundle
