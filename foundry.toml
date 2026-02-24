@@ -11,8 +11,9 @@ libs = ["dependencies", "lib"]
 
 [profile.default.invariant]
 fail_on_revert = true
-runs = 100
-depth = 1000
+
+# For deeper full-lifecycle fuzzing:
+# FOUNDRY_INVARIANT_RUNS=100 FOUNDRY_INVARIANT_DEPTH=1000 forge test --mt FullLifecycle
 
 [lint]
 ignore = [

@@ -137,18 +137,7 @@ contract FullLifecycleHandler is Test {
     mapping(address => uint256) public ghostTrancheCount;
 
     uint256 public lastSeenClearingPrice;
-
-    struct Metrics {
-        uint256 bidsSubmitted;
-        uint256 bidsRejected;
-        uint256 earlyExits;
-        uint256 earlyExitSkips;
-        uint256 checkpoints;
-        uint256 forceIterations;
-        uint256 rolls;
-    }
-
-    Metrics public metrics;
+    uint256 public unexitedBids;
 
     bool public settled;
 
@@ -223,16 +212,12 @@ contract FullLifecycleHandler is Test {
     // --- Fuzzed handler actions ---
 
     function handleRoll(uint256 seed) public {
-        if (seed % 10 == 0) {
-            vm.roll(block.number + 1);
-            metrics.rolls++;
-        }
+        if (seed % 10 == 0) vm.roll(block.number + 1);
     }
 
     function handleCheckpoint() public givenAuctionHasStarted {
         if (block.number >= auction.endBlock()) return;
         Checkpoint memory cp = auction.checkpoint();
-        metrics.checkpoints++;
 
         // Track clearing price from checkpoints only (not from forceIterateOverTicks,
         // which can set a temporary value that a subsequent checkpoint corrects).
@@ -247,14 +232,11 @@ contract FullLifecycleHandler is Test {
         uint256 targetTickPrice = floorPrice + uint256(tickNumber) * tickSpacing;
         uint256 prevTickPrice = _getLowerTick(targetTickPrice);
 
-        uint256 MAX_TICK_PTR = type(uint256).max;
         if (prevTickPrice == 0 || prevTickPrice <= auction.nextActiveTickPrice()) {
-            prevTickPrice = MAX_TICK_PTR;
+            prevTickPrice = type(uint256).max;
         }
 
-        try auction.forceIterateOverTicks(prevTickPrice) {
-            metrics.forceIterations++;
-        } catch {}
+        try auction.forceIterateOverTicks(prevTickPrice) {} catch {}
     }
 
     function handleSubmitBid(uint256 actorIndexSeed, uint128 bidAmount, uint8 tickNumber)
@@ -265,9 +247,7 @@ contract FullLifecycleHandler is Test {
     {
         if (block.number >= auction.endBlock()) return;
 
-        uint256 cp = auction.clearingPrice();
-
-        (uint128 inputAmount, uint256 maxPrice) = _useAmountMaxPrice(bidAmount, cp, tickNumber);
+        (uint128 inputAmount, uint256 maxPrice) = _useAmountMaxPrice(bidAmount, lastSeenClearingPrice, tickNumber);
         if (inputAmount == 0) return;
 
         vm.deal(currentActor, uint256(inputAmount));
@@ -277,33 +257,23 @@ contract FullLifecycleHandler is Test {
         try auction.submitBid{value: inputAmount}(maxPrice, inputAmount, currentActor, prevTickPrice, "") {
             bidIds.push(nextBidId);
             bidCount++;
-            metrics.bidsSubmitted++;
-        } catch {
-            metrics.bidsRejected++;
-        }
+        } catch {}
     }
 
     function handleEarlyExitPartiallyFilledBid(uint256 actorIndexSeed) public useActor(actorIndexSeed) {
         if (!auction.isGraduated()) return;
 
-        uint256 cp = auction.clearingPrice();
-
         for (uint256 i; i < bidCount; i++) {
             Bid memory bid = auction.bids(bidIds[i]);
             if (bid.exitedBlock != 0) continue;
-            if (bid.maxPrice >= cp) continue;
+            if (bid.maxPrice >= lastSeenClearingPrice) continue;
 
             (uint64 lower, uint64 upper) = _getLowerUpperCheckpointHints(bid.maxPrice);
             if (upper == 0) continue;
 
-            try auction.exitPartiallyFilledBid(bidIds[i], lower, upper) {
-                metrics.earlyExits++;
-            } catch {
-                metrics.earlyExitSkips++;
-            }
+            try auction.exitPartiallyFilledBid(bidIds[i], lower, upper) {} catch {}
             return;
         }
-        metrics.earlyExitSkips++;
     }
 
     // --- Settlement helpers (called from invariant functions, not by fuzzer) ---
@@ -354,7 +324,7 @@ contract FullLifecycleHandler is Test {
                 try auction.exitPartiallyFilledBid(bidIds[i], lower, upper) {}
                 catch {
                     try auction.exitPartiallyFilledBid(bidIds[i], lower, 0) {}
-                    catch {}
+                    catch { unexitedBids++; }
                 }
             }
         }
@@ -399,38 +369,33 @@ contract FullLifecycleHandler is Test {
     }
 
     function _disburseInTranches(address account, uint256 numTranches) internal {
-        uint256 remaining = tracker.missingDisbursementTo(account);
-        if (remaining == 0) return;
+        uint256 total = tracker.missingDisbursementTo(account);
+        if (total == 0) return;
 
-        uint256 perTranche = remaining / numTranches;
-        if (perTranche == 0) perTranche = remaining;
+        uint256 perTranche = total / numTranches;
+        if (perTranche == 0) {
+            numTranches = 1;
+            perTranche = total;
+        }
 
-        uint256 tranche;
-        while (remaining > 0) {
-            uint256 amount = remaining < perTranche ? remaining : perTranche;
-            if (remaining - amount < perTranche && remaining - amount > 0) {
-                amount = remaining;
-            }
+        for (uint256 i; i < numTranches; i++) {
+            uint256 amount = (i == numTranches - 1) ? total - perTranche * i : perTranche;
 
             vm.prank(disburser);
             tracker.recordDisbursement(
-                account, amount, keccak256(abi.encodePacked(account, amount, tranche))
+                account, amount, keccak256(abi.encodePacked(account, amount, i))
             );
 
             ghostTotalDisbursed += amount;
             ghostDisbursedTo[account] += amount;
             ghostTotalTranches++;
             ghostTrancheCount[account]++;
-            remaining -= amount;
-            tranche++;
         }
     }
 
     function actorsLength() external view returns (uint256) {
         return actors.length;
     }
-
-    function printMetrics() external view {}
 }
 
 contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
@@ -497,13 +462,12 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
 
         targetContract(address(handler));
 
-        bytes4[] memory excluded = new bytes4[](6);
+        bytes4[] memory excluded = new bytes4[](5);
         excluded[0] = FullLifecycleHandler.settleAuction_claimThenSweep.selector;
         excluded[1] = FullLifecycleHandler.settleAuction_sweepThenClaim.selector;
         excluded[2] = FullLifecycleHandler.disburseAll.selector;
         excluded[3] = FullLifecycleHandler.disburseInTranches.selector;
-        excluded[4] = FullLifecycleHandler.printMetrics.selector;
-        excluded[5] = FullLifecycleHandler.actorsLength.selector;
+        excluded[4] = FullLifecycleHandler.actorsLength.selector;
         excludeSelector(FuzzSelector({addr: address(handler), selectors: excluded}));
     }
 
@@ -583,9 +547,11 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
     // Clearing price from checkpoints is non-decreasing across the auction.
     // Note: forceIterateOverTicks can temporarily set a different storage value,
     // but that's not the checkpoint clearing price.
-    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public {
-        if (block.number < auction.startBlock() || block.number >= auction.endBlock()) return;
-        Checkpoint memory cp = auction.checkpoint();
-        assertGe(cp.clearingPrice, handler.lastSeenClearingPrice());
+    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public view {
+        uint64 latestBlock = auction.lastCheckpointedBlock();
+        if (latestBlock == 0) return;
+
+        Checkpoint memory latest = auction.checkpoints(latestBlock);
+        assertGe(latest.clearingPrice, handler.lastSeenClearingPrice());
     }
 }
