@@ -139,14 +139,12 @@ contract FullLifecycleHandler is Test {
     uint256 public lastSeenClearingPrice;
     uint256 public unexitedBids;
 
-    // ~10% of fuzz calls advance the block, concentrating most actions
-    // intra-block to exercise batched-bid scenarios.
-    uint256 constant ROLL_DENOMINATOR = 10;
-    uint256 constant ROLL_STEP = 1;
-
-    function updateLastSeenClearingPrice(uint256 price) external {
-        if (price > lastSeenClearingPrice) lastSeenClearingPrice = price;
-    }
+    // Default roll config: advance blocks in ~10% of calls and vary the jump
+    // size to exercise both batched intra-block and inter-block dynamics.
+    uint256 constant DEFAULT_ROLL_DENOMINATOR = 10;
+    uint256 constant DEFAULT_MAX_ROLL_STEP = 3;
+    uint256 public rollDenominator;
+    uint256 public maxRollStep;
 
     bool public settled;
 
@@ -154,12 +152,16 @@ contract FullLifecycleHandler is Test {
         ContinuousClearingAuction auction_,
         CCADisbursementTracker tracker_,
         address disburser_,
-        address[] memory actors_
+        address[] memory actors_,
+        uint256 rollDenominator_,
+        uint256 maxRollStep_
     ) {
         auction = auction_;
         tracker = tracker_;
         disburser = disburser_;
         actors = actors_;
+        rollDenominator = rollDenominator_ == 0 ? DEFAULT_ROLL_DENOMINATOR : rollDenominator_;
+        maxRollStep = maxRollStep_ == 0 ? DEFAULT_MAX_ROLL_STEP : maxRollStep_;
     }
 
     modifier givenAuctionHasStarted() {
@@ -228,7 +230,9 @@ contract FullLifecycleHandler is Test {
     // --- Fuzzed handler actions ---
 
     function handleRoll(uint256 seed) public {
-        if (seed % ROLL_DENOMINATOR == 0) vm.roll(block.number + ROLL_STEP);
+        if (seed % rollDenominator != 0) return;
+        uint256 rollStep = ((seed / rollDenominator) % maxRollStep) + 1;
+        vm.roll(block.number + rollStep);
     }
 
     function handleCheckpoint() public givenAuctionHasStarted {
@@ -425,11 +429,33 @@ abstract contract FullLifecycleInvariantBase is Test {
 
     address[] actors;
 
-    uint128 constant TOKEN_SUPPLY = 1_000 ether;
-    uint256 constant Q96 = 2 ** 96;
-    uint256 constant TICK_SPACING = 100 * Q96;
-    uint256 constant FLOOR_PRICE = 10 * TICK_SPACING;
-    uint128 constant REQUIRED_RAISE = 1 ether;
+    function _q96() internal pure returns (uint256) {
+        return 2 ** 96;
+    }
+
+    function _tokenSupply() internal pure virtual returns (uint128) {
+        return 1_000 ether;
+    }
+
+    function _tickSpacing() internal pure virtual returns (uint256) {
+        return 100 * _q96();
+    }
+
+    function _floorPrice(uint256 tickSpacing) internal pure virtual returns (uint256) {
+        return 10 * tickSpacing;
+    }
+
+    function _requiredRaise(uint128) internal pure virtual returns (uint128) {
+        return 1 ether;
+    }
+
+    function _auctionLength() internal pure virtual returns (uint24) {
+        return 100;
+    }
+
+    function _rollConfig() internal pure virtual returns (uint256 rollDenominator, uint256 maxRollStep) {
+        return (10, 3);
+    }
 
     function _buildStepsData(uint24 auctionLength) internal pure returns (bytes memory) {
         uint24 mpsPerBlock = uint24(ConstantsLib.MPS / auctionLength);
@@ -447,14 +473,20 @@ abstract contract FullLifecycleInvariantBase is Test {
         actors.push(makeAddr("bidder4"));
         actors.push(makeAddr("bidder5"));
 
+        uint128 tokenSupply = _tokenSupply();
+        uint256 tickSpacing = _tickSpacing();
+        uint256 floorPrice = _floorPrice(tickSpacing);
+        uint128 requiredRaise = _requiredRaise(tokenSupply);
+        uint24 auctionLength = _auctionLength();
+        (uint256 rollDenominator, uint256 maxRollStep) = _rollConfig();
+
         uint64 startBlock = uint64(block.number + 10);
-        uint24 auctionLength = 100;
         uint64 endBlock = startBlock + uint64(auctionLength);
         uint64 claimBlock = endBlock + 10;
 
         bytes memory stepsData = _buildStepsData(auctionLength);
 
-        tracker = new CCADisbursementTracker("CCA Tracker", "CCAT", TOKEN_SUPPLY, disburser);
+        tracker = new CCADisbursementTracker("CCA Tracker", "CCAT", tokenSupply, disburser);
 
         AuctionParameters memory params = AuctionParameters({
             currency: address(0),
@@ -463,28 +495,27 @@ abstract contract FullLifecycleInvariantBase is Test {
             startBlock: startBlock,
             endBlock: endBlock,
             claimBlock: claimBlock,
-            tickSpacing: TICK_SPACING,
+            tickSpacing: tickSpacing,
             validationHook: address(0),
-            floorPrice: FLOOR_PRICE,
-            requiredCurrencyRaised: REQUIRED_RAISE,
+            floorPrice: floorPrice,
+            requiredCurrencyRaised: requiredRaise,
             auctionStepsData: stepsData
         });
 
-        auction = new ContinuousClearingAuction(address(tracker), TOKEN_SUPPLY, params);
+        auction = new ContinuousClearingAuction(address(tracker), tokenSupply, params);
         tracker.initialize(address(auction));
         auction.onTokensReceived();
 
-        handler = new FullLifecycleHandler(auction, tracker, disburser, actors);
+        handler = new FullLifecycleHandler(auction, tracker, disburser, actors, rollDenominator, maxRollStep);
 
         targetContract(address(handler));
 
-        bytes4[] memory excluded = new bytes4[](6);
+        bytes4[] memory excluded = new bytes4[](5);
         excluded[0] = FullLifecycleHandler.settleAuction_claimThenSweep.selector;
         excluded[1] = FullLifecycleHandler.settleAuction_sweepThenClaim.selector;
         excluded[2] = FullLifecycleHandler.disburseAll.selector;
         excluded[3] = FullLifecycleHandler.disburseInTranches.selector;
         excluded[4] = FullLifecycleHandler.actorsLength.selector;
-        excluded[5] = FullLifecycleHandler.updateLastSeenClearingPrice.selector;
         excludeSelector(FuzzSelector({addr: address(handler), selectors: excluded}));
     }
 
@@ -543,16 +574,20 @@ abstract contract FullLifecycleInvariantBase is Test {
         }
     }
 
-    // Non-view: updates the handler baseline so every invocation compares
-    // against the most recently observed checkpoint, not just ones the fuzzer
-    // happened to trigger via handleCheckpoint().
-    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public {
+    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public view {
         uint64 latestBlock = auction.lastCheckpointedBlock();
         if (latestBlock == 0) return;
 
-        Checkpoint memory latest = auction.checkpoints(latestBlock);
-        assertGe(latest.clearingPrice, handler.lastSeenClearingPrice());
-        handler.updateLastSeenClearingPrice(latest.clearingPrice);
+        Checkpoint memory checkpoint = auction.checkpoints(latestBlock);
+        uint256 currentClearingPrice = checkpoint.clearingPrice;
+        uint64 currentBlock = checkpoint.prev;
+
+        while (currentBlock != 0) {
+            checkpoint = auction.checkpoints(currentBlock);
+            assertLe(checkpoint.clearingPrice, currentClearingPrice);
+            currentClearingPrice = checkpoint.clearingPrice;
+            currentBlock = checkpoint.prev;
+        }
     }
 }
 
@@ -573,5 +608,33 @@ contract FullLifecycleSweepThenClaimInvariantTest is FullLifecycleInvariantBase 
 
         handler.disburseInTranches(block.timestamp);
         _assertPostDisbursementInvariants();
+    }
+}
+
+contract FullLifecycleHardRaiseClaimThenSweepInvariantTest is FullLifecycleClaimThenSweepInvariantTest {
+    function _requiredRaise(uint128 tokenSupply) internal pure override returns (uint128) {
+        return tokenSupply * 2;
+    }
+
+    function _auctionLength() internal pure override returns (uint24) {
+        return 200;
+    }
+}
+
+contract FullLifecycleWideTickSweepThenClaimInvariantTest is FullLifecycleSweepThenClaimInvariantTest {
+    function _tickSpacing() internal pure override returns (uint256) {
+        return 250 * _q96();
+    }
+
+    function _floorPrice(uint256 tickSpacing) internal pure override returns (uint256) {
+        return 20 * tickSpacing;
+    }
+
+    function _auctionLength() internal pure override returns (uint24) {
+        return 250;
+    }
+
+    function _rollConfig() internal pure override returns (uint256 rollDenominator, uint256 maxRollStep) {
+        return (8, 4);
     }
 }
