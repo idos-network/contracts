@@ -7,6 +7,7 @@ endpoint_url = "${ARBITRUM_ONE_RPC_URL}"
 [42161.address]
 IDOSToken = "0x68731d6F14B827bBCfFbEBb62b19Daa18de1d79c"
 IDOSNodeStaking = "0x6132F2EE66deC6bdf416BDA9588D663EaCeec337"
+CCADisbursementTracker = "0x9B6bA00970Ee2976Cde889Dfd99F0c688ADEffEe"
 
 [421614]
 endpoint_url = "${ARBITRUM_SEPOLIA_RPC_URL}"
