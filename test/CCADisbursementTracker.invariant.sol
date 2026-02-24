@@ -338,7 +338,8 @@ contract FullLifecycleHandler is Test {
             if (bid.exitedBlock != 0) continue;
 
             if (bid.maxPrice > cp) {
-                auction.exitBid(bidIds[i]);
+                try auction.exitBid(bidIds[i]) {}
+                catch { unexitedBids++; }
             } else {
                 (uint64 lower, uint64 upper) = _getLowerUpperCheckpointHints(bid.maxPrice);
                 try auction.exitPartiallyFilledBid(bidIds[i], lower, upper) {}
@@ -429,16 +430,12 @@ abstract contract FullLifecycleInvariantBase is Test {
 
     address[] actors;
 
-    function _q96() internal pure returns (uint256) {
-        return 2 ** 96;
-    }
-
     function _tokenSupply() internal pure virtual returns (uint128) {
         return 1_000 ether;
     }
 
     function _tickSpacing() internal pure virtual returns (uint256) {
-        return 100 * _q96();
+        return 100 * FixedPoint96.Q96;
     }
 
     function _floorPrice(uint256 tickSpacing) internal pure virtual returns (uint256) {
@@ -623,7 +620,7 @@ contract FullLifecycleHardRaiseClaimThenSweepInvariantTest is FullLifecycleClaim
 
 contract FullLifecycleWideTickSweepThenClaimInvariantTest is FullLifecycleSweepThenClaimInvariantTest {
     function _tickSpacing() internal pure override returns (uint256) {
-        return 250 * _q96();
+        return 250 * FixedPoint96.Q96;
     }
 
     function _floorPrice(uint256 tickSpacing) internal pure override returns (uint256) {
