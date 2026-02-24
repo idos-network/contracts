@@ -139,6 +139,10 @@ contract FullLifecycleHandler is Test {
     uint256 public lastSeenClearingPrice;
     uint256 public unexitedBids;
 
+    function updateLastSeenClearingPrice(uint256 price) external {
+        if (price > lastSeenClearingPrice) lastSeenClearingPrice = price;
+    }
+
     bool public settled;
 
     constructor(
@@ -462,12 +466,13 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
 
         targetContract(address(handler));
 
-        bytes4[] memory excluded = new bytes4[](5);
+        bytes4[] memory excluded = new bytes4[](6);
         excluded[0] = FullLifecycleHandler.settleAuction_claimThenSweep.selector;
         excluded[1] = FullLifecycleHandler.settleAuction_sweepThenClaim.selector;
         excluded[2] = FullLifecycleHandler.disburseAll.selector;
         excluded[3] = FullLifecycleHandler.disburseInTranches.selector;
         excluded[4] = FullLifecycleHandler.actorsLength.selector;
+        excluded[5] = FullLifecycleHandler.updateLastSeenClearingPrice.selector;
         excludeSelector(FuzzSelector({addr: address(handler), selectors: excluded}));
     }
 
@@ -545,13 +550,15 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
     }
 
     // Clearing price from checkpoints is non-decreasing across the auction.
-    // Note: forceIterateOverTicks can temporarily set a different storage value,
-    // but that's not the checkpoint clearing price.
-    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public view {
+    // Non-view: updates the handler baseline so every invocation compares
+    // against the most recently observed checkpoint, not just ones the fuzzer
+    // happened to trigger via handleCheckpoint().
+    function invariant_FullLifecycle_CheckpointClearingPriceNonDecreasing() public {
         uint64 latestBlock = auction.lastCheckpointedBlock();
         if (latestBlock == 0) return;
 
         Checkpoint memory latest = auction.checkpoints(latestBlock);
         assertGe(latest.clearingPrice, handler.lastSeenClearingPrice());
+        handler.updateLastSeenClearingPrice(latest.clearingPrice);
     }
 }
