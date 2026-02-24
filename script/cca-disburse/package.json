@@ -9,6 +9,7 @@
 	"scripts": {
 		"run": "tsx src/index.ts",
 		"dry-run": "tsx src/index.ts --dry-run",
+		"claim-all-bids": "tsx src/claimAllBids.ts",
 		"test": "tsx --test src/*.test.ts",
 		"lint": "biome lint src",
 		"format": "biome format --write src",

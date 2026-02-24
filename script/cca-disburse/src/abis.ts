@@ -105,6 +105,97 @@ export const ccaAbi = [
     outputs: [{ name: "", type: "uint64" }],
     stateMutability: "view",
   },
+  {
+    type: "function",
+    name: "claimBlock",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nextBidId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "bids",
+    inputs: [{ name: "bidId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "startBlock", type: "uint64" },
+          { name: "startCumulativeMps", type: "uint24" },
+          { name: "exitedBlock", type: "uint64" },
+          { name: "maxPrice", type: "uint256" },
+          { name: "owner", type: "address" },
+          { name: "amountQ96", type: "uint256" },
+          { name: "tokensFilled", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "exitBid",
+    inputs: [{ name: "bidId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "exitPartiallyFilledBid",
+    inputs: [
+      { name: "bidId", type: "uint256" },
+      { name: "lastFullyFilledCheckpointBlock", type: "uint64" },
+      { name: "outbidBlock", type: "uint64" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "claimTokens",
+    inputs: [{ name: "bidId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "claimTokensBatch",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "bidIds", type: "uint256[]" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sweepUnsoldTokensBlock",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tokensRecipient",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "sweepUnsoldTokens",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
 ] as const;
 
 export const whaleDisburserAbi = [

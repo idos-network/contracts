@@ -5,7 +5,8 @@ optimizer_runs = 200
 show_progress = true
 gas_reports = ["*"]
 fs_permissions = [
-    { access = "read-write", path = "./deployments.toml" }
+    { access = "read-write", path = "./deployments.toml" },
+    { access = "read-write", path = "./patch-tracker-address.txt" }
 ]
 libs = ["dependencies", "lib"]
 

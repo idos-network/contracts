@@ -11,7 +11,7 @@ import {
   http,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum, arbitrumSepolia } from "viem/chains";
+import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
 import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis";
 import { computeDisbursement } from "./computeDisbursement";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
@@ -32,6 +32,7 @@ import {
 const SUPPORTED_CHAINS = {
   [String(arbitrumSepolia.id)]: arbitrumSepolia,
   [String(arbitrum.id)]: arbitrum,
+  [String(sepolia.id)]: sepolia,
 } as const;
 
 // -- Configuration and sanity checks ──────────────────────────────────────────
@@ -412,10 +413,29 @@ if (remainingEntries.length > 0) {
   console.log(`✅ No remaining entries to disburse.`);
 }
 
-// ── Final state ─────────────────────────────────────────────────────────────
+// ── Final state and sweep ────────────────────────────────────────────────────
 
 assertCondition(
   DRY_RUN || (await trackerContract.read.saleFullyDisbursed()),
   "Sale is not fully disbursed. This should never happen.",
 );
+console.log(`✅ Sale is fully disbursed.`);
+
+const finalDisburserBalance = await soldTokenContract.read.balanceOf([disburser.address]);
+if (finalDisburserBalance > 0n) {
+  const sweepTarget = await ccaContract.read.tokensRecipient();
+  console.log(
+    `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
+  );
+  const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
+    account: disburser,
+  });
+  await publicClient.waitForTransactionReceipt({ hash: tx });
+}
+assertCondition(
+  (await soldTokenContract.read.balanceOf([disburser.address])) === 0n,
+  `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
+);
+console.log(`✅ No remaining tokens on disburser.`);
+
 console.log(`✅ Run completed successfully.`);
