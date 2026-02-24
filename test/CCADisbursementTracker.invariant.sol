@@ -139,6 +139,11 @@ contract FullLifecycleHandler is Test {
     uint256 public lastSeenClearingPrice;
     uint256 public unexitedBids;
 
+    // ~10% of fuzz calls advance the block, concentrating most actions
+    // intra-block to exercise batched-bid scenarios.
+    uint256 constant ROLL_DENOMINATOR = 10;
+    uint256 constant ROLL_STEP = 1;
+
     function updateLastSeenClearingPrice(uint256 price) external {
         if (price > lastSeenClearingPrice) lastSeenClearingPrice = price;
     }
@@ -176,7 +181,9 @@ contract FullLifecycleHandler is Test {
         if (maxPrice <= price) return 0;
         uint256 cached = price;
         while (price < maxPrice) {
-            price = auction.ticks(price).next;
+            uint256 next = auction.ticks(price).next;
+            if (next == 0 || next == type(uint256).max) break;
+            price = next;
             if (price >= maxPrice) break;
             cached = price;
         }
@@ -202,7 +209,12 @@ contract FullLifecycleHandler is Test {
         uint256 floorPrice = auction.floorPrice();
         tickNumber = uint8(bound(uint256(tickNumber), 1, type(uint8).max));
         uint256 tickNumberPrice = floorPrice + uint256(tickNumber) * tickSpacing;
-        uint256 maxPrice = bound(tickNumberPrice, clearingPrice + tickSpacing, type(uint128).max * FixedPoint96.Q96);
+
+        uint256 minPrice = clearingPrice + tickSpacing;
+        uint256 rem = minPrice % tickSpacing;
+        if (rem != 0) minPrice += tickSpacing - rem;
+
+        uint256 maxPrice = bound(tickNumberPrice, minPrice, type(uint128).max * FixedPoint96.Q96);
         maxPrice -= (maxPrice % tickSpacing);
         uint128 inputAmount;
         if (amount > (type(uint128).max * FixedPoint96.Q96) / maxPrice) {
@@ -216,7 +228,7 @@ contract FullLifecycleHandler is Test {
     // --- Fuzzed handler actions ---
 
     function handleRoll(uint256 seed) public {
-        if (seed % 10 == 0) vm.roll(block.number + 1);
+        if (seed % ROLL_DENOMINATOR == 0) vm.roll(block.number + ROLL_STEP);
     }
 
     function handleCheckpoint() public givenAuctionHasStarted {
@@ -402,7 +414,7 @@ contract FullLifecycleHandler is Test {
     }
 }
 
-contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
+abstract contract FullLifecycleInvariantBase is Test {
     CCADisbursementTracker tracker;
     ContinuousClearingAuction auction;
     FullLifecycleHandler handler;
@@ -478,6 +490,7 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
 
     function _assertPostSettlementInvariants() internal view {
         assertTrue(tracker.saleFullyClaimed(), "Sale should be fully claimed after settlement");
+        assertEq(handler.unexitedBids(), 0, "All bids should have been exited during settlement");
 
         uint256 sum;
         for (uint256 i; i < actors.length; i++) {
@@ -524,32 +537,12 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
         );
     }
 
-    // Claim then sweep, disburse all at once.
-    function invariant_FullLifecycle_ClaimThenSweep_DisburseAll() public {
-        handler.settleAuction_claimThenSweep();
-        _assertPostSettlementInvariants();
-
-        handler.disburseAll();
-        _assertPostDisbursementInvariants();
-    }
-
-    // Sweep then claim, disburse in fuzzed tranches.
-    function invariant_FullLifecycle_SweepThenClaim_DisburseInTranches() public {
-        handler.settleAuction_sweepThenClaim();
-        _assertPostSettlementInvariants();
-
-        handler.disburseInTranches(block.timestamp);
-        _assertPostDisbursementInvariants();
-    }
-
-    // Pre-settlement: missing disbursements always equal burned supply.
     function invariant_FullLifecycle_MissingEqualsBurnedBeforeClaim() public view {
         if (!tracker.saleFullyClaimed()) {
             assertEq(tracker.totalMissingDisbursements(), tracker.initialSupply() - tracker.totalSupply());
         }
     }
 
-    // Clearing price from checkpoints is non-decreasing across the auction.
     // Non-view: updates the handler baseline so every invocation compares
     // against the most recently observed checkpoint, not just ones the fuzzer
     // happened to trigger via handleCheckpoint().
@@ -560,5 +553,25 @@ contract CCADisbursementTrackerFullLifecycleInvariantTest is Test {
         Checkpoint memory latest = auction.checkpoints(latestBlock);
         assertGe(latest.clearingPrice, handler.lastSeenClearingPrice());
         handler.updateLastSeenClearingPrice(latest.clearingPrice);
+    }
+}
+
+contract FullLifecycleClaimThenSweepInvariantTest is FullLifecycleInvariantBase {
+    function invariant_FullLifecycle_ClaimThenSweep_DisburseAll() public {
+        handler.settleAuction_claimThenSweep();
+        _assertPostSettlementInvariants();
+
+        handler.disburseAll();
+        _assertPostDisbursementInvariants();
+    }
+}
+
+contract FullLifecycleSweepThenClaimInvariantTest is FullLifecycleInvariantBase {
+    function invariant_FullLifecycle_SweepThenClaim_DisburseInTranches() public {
+        handler.settleAuction_sweepThenClaim();
+        _assertPostSettlementInvariants();
+
+        handler.disburseInTranches(block.timestamp);
+        _assertPostDisbursementInvariants();
     }
 }
