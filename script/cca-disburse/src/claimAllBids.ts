@@ -78,7 +78,7 @@ async function main() {
 		`No contract at ${CCA_ADDRESS} on chain ${chain.id}.`,
 	);
 
-	const [ccaStartBlock, ccaEndBlock, claimBlock, currentBlock] =
+	const [ccaStartBlock, ccaEndBlock, ccaClaimBlock, currentBlock] =
 		await Promise.all([
 			ccaContract.read.startBlock(),
 			ccaContract.read.endBlock(),
@@ -91,13 +91,13 @@ async function main() {
 		`Auction not ended. Current block ${currentBlock}, end block ${ccaEndBlock}.`,
 	);
 	assertCondition(
-		currentBlock >= claimBlock,
-		`Claim block not reached. Current block ${currentBlock}, claim block ${claimBlock}.`,
+		currentBlock >= ccaClaimBlock,
+		`Claim block not reached. Current block ${currentBlock}, claim block ${ccaClaimBlock}.`,
 	);
 
 	console.log(`CCA: ${CCA_ADDRESS}`);
 	console.log(
-		`Blocks: start ${ccaStartBlock}, end ${ccaEndBlock}, claim ${claimBlock}, current ${currentBlock}\n`,
+		`Blocks: start ${ccaStartBlock}, end ${ccaEndBlock}, claim ${ccaClaimBlock}, current ${currentBlock}\n`,
 	);
 
 	const [bidLogs, claimLogs] = await Promise.all([
@@ -126,8 +126,6 @@ async function main() {
 		console.log("No unclaimed bids.");
 	}
 
-	const startBlock = ccaStartBlock;
-
 	for (const { bidId } of unclaimed) {
 		const bid = await ccaContract.read.bids([bidId]);
 		const exited = bid.exitedBlock !== 0n;
@@ -146,7 +144,7 @@ async function main() {
 				try {
 					const hash = await ccaContract.write.exitPartiallyFilledBid([
 						bidId,
-						startBlock,
+						ccaStartBlock,
 						0n,
 					]);
 					await publicClient.waitForTransactionReceipt({ hash });
@@ -155,7 +153,7 @@ async function main() {
 					const outbidBlock = ccaEndBlock > 0n ? ccaEndBlock - 1n : 0n;
 					const hash = await ccaContract.write.exitPartiallyFilledBid([
 						bidId,
-						startBlock,
+						ccaStartBlock,
 						outbidBlock,
 					]);
 					await publicClient.waitForTransactionReceipt({ hash });
