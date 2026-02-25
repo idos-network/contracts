@@ -129,12 +129,17 @@ async function main() {
         console.log(`Exited bid ${bidId}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("CannotExitBid") || msg.includes("0x") /* selector */) {
+        if (!msg.includes("CannotExitBid") && !msg.includes("0x")) throw e;
+        // Partially filled: try exit at end (outbidBlock = 0) then outbid (outbidBlock = endBlock - 1)
+        try {
           const hash = await ccaContract.write.exitPartiallyFilledBid([bidId, startBlock, 0n]);
           await publicClient.waitForTransactionReceipt({ hash });
-          console.log(`Exited bid ${bidId} (partially filled)`);
-        } else {
-          throw e;
+          console.log(`Exited bid ${bidId} (partially filled at end)`);
+        } catch {
+          const outbidBlock = ccaEndBlock > 0n ? ccaEndBlock - 1n : 0n;
+          const hash = await ccaContract.write.exitPartiallyFilledBid([bidId, startBlock, outbidBlock]);
+          await publicClient.waitForTransactionReceipt({ hash });
+          console.log(`Exited bid ${bidId} (outbid)`);
         }
       }
     }
