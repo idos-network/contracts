@@ -12,7 +12,7 @@
 #   2. Replaces the tracker's bytecode on Anvil with that (anvil_setCode) so your key is the disburser.
 #   3. Runs cca-disburse with RPC_URL=http://127.0.0.1:8545 so it talks to Anvil.
 
-set -e
+set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
