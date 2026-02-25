@@ -33,17 +33,32 @@ function checkAbiAgainstArtifact(
   },
 ): void {
   const builtAbi = artifact.abi;
-  const byKey = new Map<string, (typeof builtAbi)[number]>();
+  const byKey = new Map<string, (typeof builtAbi)[number][]>();
   for (const item of builtAbi) {
-    if (item.name != null) byKey.set(`${item.type}:${item.name}`, item);
+    if (item.name != null) {
+      const key = `${item.type}:${item.name}`;
+      byKey.set(key, [...(byKey.get(key) ?? []), item]);
+    }
   }
   for (const entry of staticAbi) {
     const name = "name" in entry ? entry.name : undefined;
     if (name == null) continue;
     const key = `${entry.type}:${name}`;
-    const built = byKey.get(key);
-    if (!built) throw new Error(`artifact missing ${key}`);
+    const builtCandidates = byKey.get(key);
+    if (builtCandidates == null || builtCandidates.length === 0) {
+      throw new Error(`artifact missing ${key}`);
+    }
     const expected = abiItemSignature(entry as Parameters<typeof abiItemSignature>[0]);
+    const built = builtCandidates.find((candidate) => abiItemSignature(candidate) === expected);
+    if (!built) {
+      throw new Error(
+        [
+          `${key} signature differs:`,
+          `  expected (abis.ts): ${expected}`,
+          `  observed candidates (artifact): ${builtCandidates.map((candidate) => abiItemSignature(candidate)).join(", ")}`,
+        ].join("\n"),
+      );
+    }
     const observed = abiItemSignature(built);
     if (expected !== observed)
       throw new Error(
