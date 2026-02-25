@@ -178,8 +178,7 @@ async function main() {
 
   for (const [owner, bidIds] of byOwner) {
     if (bidIds.length === 1) {
-      const singleId = bidIds[0];
-      if (singleId === undefined) continue;
+      const singleId = bidIds[0] as bigint;
       const hash = await ccaContract.write.claimTokens([singleId]);
       await publicClient.waitForTransactionReceipt({ hash });
       console.log(`Claimed bid ${singleId} for ${owner}`);
