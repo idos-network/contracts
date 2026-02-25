@@ -155,7 +155,13 @@ async function main() {
           const hash = await ccaContract.write.exitPartiallyFilledBid([bidId, ccaStartBlock, 0n]);
           await publicClient.waitForTransactionReceipt({ hash });
           console.log(`Exited bid ${bidId} (partially filled at end)`);
-        } catch {
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const isPartiallyFilledAtEndRevert =
+            msg.includes("CannotExitBid") ||
+            msg.includes("InvalidLastFullyFilledCheckpointHint") ||
+            msg.includes("CannotPartiallyExitBidBeforeEndBlock");
+          if (!isPartiallyFilledAtEndRevert) throw err;
           const outbidBlock = ccaEndBlock > 0n ? ccaEndBlock - 1n : 0n;
           const hash = await ccaContract.write.exitPartiallyFilledBid([
             bidId,
