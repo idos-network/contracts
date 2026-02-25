@@ -1,3 +1,5 @@
+import { assertAbisMatchArtifacts } from "./abiChecker.js";
+
 export const trackerAbi = [
   {
     type: "event",
@@ -105,6 +107,97 @@ export const ccaAbi = [
     outputs: [{ name: "", type: "uint64" }],
     stateMutability: "view",
   },
+  {
+    type: "function",
+    name: "claimBlock",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nextBidId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "bids",
+    inputs: [{ name: "bidId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "startBlock", type: "uint64" },
+          { name: "startCumulativeMps", type: "uint24" },
+          { name: "exitedBlock", type: "uint64" },
+          { name: "maxPrice", type: "uint256" },
+          { name: "owner", type: "address" },
+          { name: "amountQ96", type: "uint256" },
+          { name: "tokensFilled", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "exitBid",
+    inputs: [{ name: "_bidId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "exitPartiallyFilledBid",
+    inputs: [
+      { name: "_bidId", type: "uint256" },
+      { name: "_lastFullyFilledCheckpointBlock", type: "uint64" },
+      { name: "_outbidBlock", type: "uint64" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "claimTokens",
+    inputs: [{ name: "_bidId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "claimTokensBatch",
+    inputs: [
+      { name: "_owner", type: "address" },
+      { name: "_bidIds", type: "uint256[]" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sweepUnsoldTokensBlock",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tokensRecipient",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "sweepUnsoldTokens",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
 ] as const;
 
 export const whaleDisburserAbi = [
@@ -148,7 +241,7 @@ export const erc20Abi = [
     name: "transfer",
     inputs: [
       { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
@@ -158,7 +251,7 @@ export const erc20Abi = [
     name: "approve",
     inputs: [
       { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
@@ -181,3 +274,10 @@ export const erc20Abi = [
     stateMutability: "view",
   },
 ] as const;
+
+assertAbisMatchArtifacts({
+  ccaAbi,
+  trackerAbi,
+  whaleDisburserAbi,
+  erc20Abi,
+} as Parameters<typeof assertAbisMatchArtifacts>[0]);
