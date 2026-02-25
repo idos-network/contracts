@@ -396,8 +396,9 @@ if (remainingEntries.length > 0) {
   const disburserBalance = await soldTokenContract.read.balanceOf([disburser.address]);
   assertCondition(
     disburserBalance >= remainingTokenTotal,
-    `Insufficient token balance. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
+    `${disburser.address} has insufficient token balance of ${soldTokenContract.address}. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
   );
+  console.log(`✅ Disburser has sufficient token balance.`);
 
   const whaleTotal = sumOf(
     remainingEntries.filter((e) => e.kind === "whale").map((e) => e.transferAmount),
