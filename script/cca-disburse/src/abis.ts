@@ -1,3 +1,5 @@
+import { assertAbisMatchArtifacts } from "./abiChecker.js";
+
 export const trackerAbi = [
   {
     type: "event",
@@ -143,7 +145,7 @@ export const ccaAbi = [
   {
     type: "function",
     name: "exitBid",
-    inputs: [{ name: "bidId", type: "uint256" }],
+    inputs: [{ name: "_bidId", type: "uint256" }],
     outputs: [],
     stateMutability: "nonpayable",
   },
@@ -151,9 +153,9 @@ export const ccaAbi = [
     type: "function",
     name: "exitPartiallyFilledBid",
     inputs: [
-      { name: "bidId", type: "uint256" },
-      { name: "lastFullyFilledCheckpointBlock", type: "uint64" },
-      { name: "outbidBlock", type: "uint64" },
+      { name: "_bidId", type: "uint256" },
+      { name: "_lastFullyFilledCheckpointBlock", type: "uint64" },
+      { name: "_outbidBlock", type: "uint64" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -161,7 +163,7 @@ export const ccaAbi = [
   {
     type: "function",
     name: "claimTokens",
-    inputs: [{ name: "bidId", type: "uint256" }],
+    inputs: [{ name: "_bidId", type: "uint256" }],
     outputs: [],
     stateMutability: "nonpayable",
   },
@@ -169,8 +171,8 @@ export const ccaAbi = [
     type: "function",
     name: "claimTokensBatch",
     inputs: [
-      { name: "owner", type: "address" },
-      { name: "bidIds", type: "uint256[]" },
+      { name: "_owner", type: "address" },
+      { name: "_bidIds", type: "uint256[]" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -239,7 +241,7 @@ export const erc20Abi = [
     name: "transfer",
     inputs: [
       { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
@@ -249,7 +251,7 @@ export const erc20Abi = [
     name: "approve",
     inputs: [
       { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
@@ -272,3 +274,10 @@ export const erc20Abi = [
     stateMutability: "view",
   },
 ] as const;
+
+assertAbisMatchArtifacts({
+  ccaAbi,
+  trackerAbi,
+  whaleDisburserAbi,
+  erc20Abi,
+} as Parameters<typeof assertAbisMatchArtifacts>[0]);
