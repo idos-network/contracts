@@ -39,7 +39,8 @@ LOCAL_RPC_URL="http://127.0.0.1:8545"
 echo "Patching tracker at $TRACKER_ADDRESS so disburser is $PATCH_DISBURSER on Anvil..."
 
 # Fund the disburser on the fork so they can pay for the patch deployment and later txs
-cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"0x52b7d2dcc80cd2e4000000\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
+# 10000 ether in wei (same order as Anvil’s default per-account balance)
+cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"$(cast --to-hex "$(cast to-wei 10_000 ether)")\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
 
 # Deploy patch contract on Anvil (from disburser) and write its address to a file
 forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url "$LOCAL_RPC_URL" --broadcast --private-key "$DISBURSER_PRIVATE_KEY"
