@@ -5,9 +5,7 @@
  * and PRIVATE_KEY (or DISBURSER_PRIVATE_KEY) for sending transactions. Anyone can call
  * exit/claim; tokens are sent to the bid owner.
  *
- * Usage:
- *   pnpm exec tsx src/claimAllBids.ts           # run
- *   pnpm exec tsx src/claimAllBids.ts --dry-run  # only list what would be done
+ * Usage: pnpm exec tsx src/claimAllBids.ts
  */
 
 import "dotenv/config";
@@ -36,9 +34,6 @@ const SUPPORTED_CHAINS = {
   [String(arbitrum.id)]: arbitrum,
   [String(sepolia.id)]: sepolia,
 } as const;
-
-const DRY_RUN = process.argv.includes("--dry-run");
-if (DRY_RUN) console.log("[dry-run] No transactions will be sent.\n");
 
 const CHAIN_ID = requireEnv("CHAIN_ID");
 const RPC_URL = requireEnv("RPC_URL");
@@ -123,15 +118,11 @@ async function main() {
 
   const startBlock = ccaStartBlock;
 
-  for (const { bidId, owner } of unclaimed) {
+  for (const { bidId } of unclaimed) {
     const bid = await ccaContract.read.bids([bidId]);
     const exited = bid.exitedBlock !== 0n;
 
     if (!exited) {
-      if (DRY_RUN) {
-        console.log(`[dry-run] Would exit bid ${bidId} (owner ${owner})`);
-        continue;
-      }
       try {
         const hash = await ccaContract.write.exitBid([bidId]);
         await publicClient.waitForTransactionReceipt({ hash });
@@ -157,12 +148,6 @@ async function main() {
   }
 
   for (const [owner, bidIds] of byOwner) {
-    if (DRY_RUN) {
-      console.log(
-        `[dry-run] Would claim ${bidIds.length} bid(s) for ${owner}: ${bidIds.join(", ")}`,
-      );
-      continue;
-    }
     if (bidIds.length === 1) {
       const singleId = bidIds[0];
       if (singleId === undefined) continue;
@@ -179,18 +164,14 @@ async function main() {
   // Sweep unsold tokens if not already done (required for tracker to consider sale fully claimed)
   const sweepBlock = await ccaContract.read.sweepUnsoldTokensBlock();
   if (sweepBlock === 0n) {
-    if (DRY_RUN) {
-      console.log("[dry-run] Would call sweepUnsoldTokens()");
-    } else {
-      const hash = await ccaContract.write.sweepUnsoldTokens();
-      await publicClient.waitForTransactionReceipt({ hash });
-      console.log("Swept unsold tokens.");
-    }
+    const hash = await ccaContract.write.sweepUnsoldTokens();
+    await publicClient.waitForTransactionReceipt({ hash });
+    console.log("Swept unsold tokens.");
   } else {
     console.log("Tokens already swept (sweepUnsoldTokensBlock != 0).");
   }
 
-  if (!DRY_RUN) console.log("\nDone.");
+  console.log("\nDone.");
 }
 
 main().catch((e) => {
