@@ -422,20 +422,31 @@ assertCondition(
 console.log(`✅ Sale is fully disbursed.`);
 
 const finalDisburserBalance = await soldTokenContract.read.balanceOf([disburser.address]);
-if (finalDisburserBalance > 0n) {
-  const sweepTarget = await ccaContract.read.tokensRecipient();
-  console.log(
-    `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
-  );
-  const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
-    account: disburser,
-  });
-  await publicClient.waitForTransactionReceipt({ hash: tx });
+const sweepTarget = await ccaContract.read.tokensRecipient();
+if (!DRY_RUN) {
+  if (finalDisburserBalance > 0n) {
+    console.log(
+      `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
+    );
+    const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
+      account: disburser,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: tx });
+
+    assertCondition(
+      (await soldTokenContract.read.balanceOf([disburser.address])) === 0n,
+      `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
+    );
+  }
+  console.log(`✅ No remaining tokens on disburser.`);
+} else {
+  if (finalDisburserBalance > 0n) {
+    console.log(
+      `[dry-run] Would sweep remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget}`,
+    );
+  } else {
+    console.log(`✅ No remaining tokens on disburser.`);
+  }
 }
-assertCondition(
-  (await soldTokenContract.read.balanceOf([disburser.address])) === 0n,
-  `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
-);
-console.log(`✅ No remaining tokens on disburser.`);
 
 console.log(`✅ Run completed successfully.`);
