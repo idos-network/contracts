@@ -63,6 +63,8 @@ const ccaContract = getContract({
   client: { public: publicClient, wallet: walletClient },
 });
 
+type BidState = Awaited<ReturnType<typeof ccaContract.read.bids>>;
+
 async function main() {
   const rpcChainId = await publicClient.getChainId();
   assertCondition(
@@ -123,8 +125,20 @@ async function main() {
     console.log("No unclaimed bids.");
   }
 
+  const bidStates = (await publicClient.multicall({
+    contracts: unclaimed.map(({ bidId }) => ({
+      address: CCA_ADDRESS,
+      abi: ccaAbi,
+      functionName: "bids",
+      args: [bidId],
+    })),
+    allowFailure: false,
+  })) as unknown as BidState[];
+  const bidByBidId = new Map(unclaimed.map((u, i) => [u.bidId, bidStates[i]]));
+
   for (const { bidId } of unclaimed) {
-    const bid = await ccaContract.read.bids([bidId]);
+    // biome-ignore lint/style/noNonNullAssertion: We just fetched the bid states, so it must exist
+    const bid = bidByBidId.get(bidId)!;
     const exited = bid.exitedBlock !== 0n;
 
     if (!exited) {
