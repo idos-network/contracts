@@ -29,7 +29,8 @@ fi
 
 TRACKER_ADDRESS="${TRACKER_TOKEN_ADDRESS:?Set TRACKER_TOKEN_ADDRESS in script/cca-disburse/.env}"
 # Derive disburser address from private key (strip 0x if present for cast)
-KEY="${DISBURSER_PRIVATE_KEY#0x}"
+KEY="${DISBURSER_PRIVATE_KEY:?Set DISBURSER_PRIVATE_KEY in script/cca-disburse/.env}"
+KEY="${KEY#0x}"
 PATCH_DISBURSER=$(cast wallet address "$KEY")
 export TRACKER_ADDRESS PATCH_DISBURSER
 
