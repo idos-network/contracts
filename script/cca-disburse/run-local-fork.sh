@@ -40,7 +40,7 @@ echo "Patching tracker at $TRACKER_ADDRESS so disburser is $PATCH_DISBURSER on A
 
 # Fund the disburser on the fork so they can pay for the patch deployment and later txs
 # 10000 ether in wei (same order as Anvil’s default per-account balance)
-cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"$(cast --to-hex "$(cast to-wei 10_000 ether)")\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
+cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"$(cast to-hex "$(cast to-wei 10_000 ether)")\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
 
 # Deploy patch contract on Anvil (from disburser) and write its address to a file
 forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url "$LOCAL_RPC_URL" --broadcast --private-key "$DISBURSER_PRIVATE_KEY"
