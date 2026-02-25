@@ -34,20 +34,22 @@ KEY="${KEY#0x}"
 PATCH_DISBURSER=$(cast wallet address "$KEY")
 export TRACKER_ADDRESS PATCH_DISBURSER
 
+LOCAL_RPC_URL="http://127.0.0.1:8545"
+
 echo "Patching tracker at $TRACKER_ADDRESS so disburser is $PATCH_DISBURSER on Anvil..."
 
 # Fund the disburser on the fork so they can pay for the patch deployment and later txs
-cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"0x52b7d2dcc80cd2e4000000\"]" --raw --rpc-url http://127.0.0.1:8545 >/dev/null
+cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"0x52b7d2dcc80cd2e4000000\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
 
 # Deploy patch contract on Anvil (from disburser) and write its address to a file
-forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --private-key "$DISBURSER_PRIVATE_KEY"
+forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url "$LOCAL_RPC_URL" --broadcast --private-key "$DISBURSER_PRIVATE_KEY"
 PATCH_ADDR=$(cat patch-tracker-address.txt)
-CODE=$(cast code "$PATCH_ADDR" --rpc-url http://127.0.0.1:8545)
+CODE=$(cast code "$PATCH_ADDR" --rpc-url "$LOCAL_RPC_URL")
 # Overwrite the existing tracker's bytecode with the patch (same logic, new disburser immutable)
-cast rpc anvil_setCode "[\"$TRACKER_ADDRESS\", \"$CODE\"]" --raw --rpc-url http://127.0.0.1:8545 >/dev/null
+cast rpc anvil_setCode "[\"$TRACKER_ADDRESS\", \"$CODE\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
 echo "Tracker bytecode patched on Anvil."
 
 cd script/cca-disburse
-export RPC_URL="http://127.0.0.1:8545"
+export RPC_URL="$LOCAL_RPC_URL"
 pnpm run claim-all-bids
 pnpm run run
