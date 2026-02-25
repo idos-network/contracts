@@ -15,9 +15,12 @@ type AbiEntry = ReadonlyArray<{
   readonly outputs?: ReadonlyArray<unknown>;
 }>;
 
-function abiItemSignature(
-  item: { type: string; name?: string; inputs?: unknown[]; outputs?: unknown[] },
-): string {
+function abiItemSignature(item: {
+  type: string;
+  name?: string;
+  inputs?: unknown[];
+  outputs?: unknown[];
+}): string {
   if (item.type === "function") return toFunctionSignature(item as unknown as AbiFunction);
   if (item.type === "event") return toEventSignature(item as unknown as AbiEvent);
   return JSON.stringify(item);
@@ -25,7 +28,9 @@ function abiItemSignature(
 
 function checkAbiAgainstArtifact(
   staticAbi: AbiEntry,
-  artifact: { abi: readonly { type: string; name?: string; inputs?: unknown[]; outputs?: unknown[] }[] },
+  artifact: {
+    abi: readonly { type: string; name?: string; inputs?: unknown[]; outputs?: unknown[] }[];
+  },
 ): void {
   const builtAbi = artifact.abi;
   const byKey = new Map<string, (typeof builtAbi)[number]>();
