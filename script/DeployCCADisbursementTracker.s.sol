@@ -27,7 +27,7 @@ contract DeployCCADisbursementTracker is RecordingDeployer {
         deployCCADisbursementTracker(
             vm.envOr("TRACKER_NAME", string("rIDOS")),
             vm.envOr("TRACKER_SYMBOL", string("rIDOS")),
-            vm.envOr("TRACKER_INITIAL_SUPPLY", uint256(1_000_000 ether)),
+            vm.envOr("TRACKER_INITIAL_SUPPLY", uint256(10_000_000 ether)),
             vm.envAddress("TRACKER_DISBURSER")
         );
     }
