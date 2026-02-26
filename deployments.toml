@@ -12,6 +12,10 @@ CCADisbursementTracker = "0xb628B89067E8f7Dfc2cB528a72BcfF7d5cEDcE29"
 [421614]
 endpoint_url = "${ARBITRUM_SEPOLIA_RPC_URL}"
 
+[421614.address]
+IDOSToken = "0xdb3b7BB52dD6cfE1157022bde6dfc28D8101e180"
+IDOSNodeStaking = "0xA07742fd930A8dF8dF35eE483aEe933545f84378"
+
 [11155111]
 endpoint_url = "${SEPOLIA_RPC_URL}"
 
