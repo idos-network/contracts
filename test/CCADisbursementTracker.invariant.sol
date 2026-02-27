@@ -83,8 +83,7 @@ contract CCADisbursementTrackerInvariantTest is Test {
     }
 
     function invariant_AccountingSumMatchesTotal() public view {
-        uint256 sum = tracker.missingDisbursementTo(holder1)
-            + tracker.missingDisbursementTo(holder2)
+        uint256 sum = tracker.missingDisbursementTo(holder1) + tracker.missingDisbursementTo(holder2)
             + tracker.missingDisbursementTo(holder3);
         assertEq(tracker.totalMissingDisbursements(), sum);
     }

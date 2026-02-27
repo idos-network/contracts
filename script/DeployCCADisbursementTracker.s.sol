@@ -13,11 +13,11 @@ contract DeployCCADisbursementTracker is RecordingDeployer {
         address disburser
     ) internal returns (CCADisbursementTracker) {
         address payable trackerAddr = payable(getOrDeploy(
-            block.chainid,
-            "CCADisbursementTracker",
-            "src/CCADisbursementTracker.sol:CCADisbursementTracker",
-            abi.encode(name, symbol, initialSupply, disburser)
-        ));
+                block.chainid,
+                "CCADisbursementTracker",
+                "src/CCADisbursementTracker.sol:CCADisbursementTracker",
+                abi.encode(name, symbol, initialSupply, disburser)
+            ));
         return CCADisbursementTracker(trackerAddr);
     }
 

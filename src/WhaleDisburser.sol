@@ -23,12 +23,10 @@ contract WhaleDisburser {
         uint256 vestedAmount
     );
 
-    function disburse(
-        IERC20 token,
-        address beneficiary,
-        uint256 totalAmount,
-        uint64 vestingStart
-    ) external returns (address) {
+    function disburse(IERC20 token, address beneficiary, uint256 totalAmount, uint64 vestingStart)
+        external
+        returns (address)
+    {
         if (totalAmount == 0) revert TotalAmountIsZero();
         if (beneficiary == address(0)) revert ZeroAddressBeneficiary();
 
@@ -40,12 +38,7 @@ contract WhaleDisburser {
         address vestingWallet;
         uint256 vestedAmount = totalAmount - immediateAmount;
         if (vestedAmount > 0) {
-            vestingWallet = address(new IDOSVesting(
-                beneficiary,
-                vestingStart,
-                VESTING_DURATION,
-                VESTING_CLIFF
-            ));
+            vestingWallet = address(new IDOSVesting(beneficiary, vestingStart, VESTING_DURATION, VESTING_CLIFF));
             token.safeTransferFrom(msg.sender, vestingWallet, vestedAmount);
         }
 

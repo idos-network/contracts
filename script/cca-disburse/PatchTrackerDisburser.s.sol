@@ -18,12 +18,7 @@ contract PatchTrackerDisburser is Script {
         uint256 initialSupply = tracker.initialSupply();
 
         vm.startBroadcast();
-        CCADisbursementTracker patch = new CCADisbursementTracker(
-            name,
-            symbol,
-            initialSupply,
-            patchDisburser
-        );
+        CCADisbursementTracker patch = new CCADisbursementTracker(name, symbol, initialSupply, patchDisburser);
         vm.stopBroadcast();
 
         vm.writeFile("patch-tracker-address.txt", vm.toString(address(patch)));

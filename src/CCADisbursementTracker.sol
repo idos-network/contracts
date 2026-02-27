@@ -89,12 +89,9 @@ contract CCADisbursementTracker is ERC20 {
     /// @param symbol ERC20 token symbol.
     /// @param initialSupply_ Total supply to mint; must match the CCA's totalSupply requirement.
     /// @param disburser_ Address authorized to record disbursements after the sale is fully claimed.
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint256 initialSupply_,
-        address disburser_
-    ) ERC20(name, symbol) {
+    constructor(string memory name, string memory symbol, uint256 initialSupply_, address disburser_)
+        ERC20(name, symbol)
+    {
         if (disburser_ == address(0)) revert ZeroAddressDisburser();
         if (initialSupply_ == 0) revert NoInitialSupply();
 

@@ -445,15 +445,10 @@ contract CCADisbursementTrackerIntegrationTest is Test {
 
         bytes memory stepsData = _buildStepsData(auctionLength);
 
-        tracker = new CCADisbursementTracker(
-            "CCA Tracker", "CCAT", TOKEN_SUPPLY, disburser_
-        );
+        tracker = new CCADisbursementTracker("CCA Tracker", "CCAT", TOKEN_SUPPLY, disburser_);
 
-        auction = _deployAuction(
-            address(tracker), TOKEN_SUPPLY,
-            startBlock, endBlock, claimBlock,
-            REQUIRED_RAISE, stepsData
-        );
+        auction =
+            _deployAuction(address(tracker), TOKEN_SUPPLY, startBlock, endBlock, claimBlock, REQUIRED_RAISE, stepsData);
 
         tracker.initialize(address(auction));
         auction.onTokensReceived();
@@ -529,7 +524,8 @@ contract CCADisbursementTrackerIntegrationTest is Test {
         vm.roll(startBlock);
         vm.deal(bidder1, 100 ether);
         vm.prank(bidder1);
-        uint256 bidId = auction.submitBid{value: 0.5 ether}(FLOOR_PRICE + TICK_SPACING, 0.5 ether, bidder1, FLOOR_PRICE, "");
+        uint256 bidId =
+            auction.submitBid{value: 0.5 ether}(FLOOR_PRICE + TICK_SPACING, 0.5 ether, bidder1, FLOOR_PRICE, "");
 
         vm.roll(endBlock);
         auction.exitBid(bidId);

@@ -10,19 +10,16 @@ import {DeployIDOSToken} from "./DeployIDOSToken.s.sol";
 ///      Skips deployment when addresses exist for this chain; writes new addresses after deploy.
 contract DeployIDOSNodeStaking is DeployIDOSToken {
     // forge-lint: disable-next-line(mixed-case-function) -- IDOS is the token name
-    function deployIDOSNodeStaking(
-        IDOSToken idosToken,
-        address initialOwner,
-        uint48 startTime,
-        uint256 epochReward
-    ) internal returns (address) {
-        return
-            getOrDeploy(
-                block.chainid,
-                "IDOSNodeStaking",
-                "src/IDOSNodeStaking.sol:IDOSNodeStaking",
-                abi.encode(idosToken, initialOwner, startTime, epochReward)
-            );
+    function deployIDOSNodeStaking(IDOSToken idosToken, address initialOwner, uint48 startTime, uint256 epochReward)
+        internal
+        returns (address)
+    {
+        return getOrDeploy(
+            block.chainid,
+            "IDOSNodeStaking",
+            "src/IDOSNodeStaking.sol:IDOSNodeStaking",
+            abi.encode(idosToken, initialOwner, startTime, epochReward)
+        );
     }
 
     function run() external override {
