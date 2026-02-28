@@ -19,7 +19,7 @@ import {
   executeInGasFilledBatches,
 } from "./batch.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
-import { requireEnv } from "./lib.js";
+import { ensureHex, requireEnv } from "./lib.js";
 
 // --- Config ---
 
@@ -28,7 +28,7 @@ const TDE_DISBURSEMENT_DEPLOYMENT_BLOCK = BigInt(requireEnv("TDE_DISBURSEMENT_DE
 
 const BATCH_CALLER_ADDRESS = getAddress(requireEnv("BATCH_CALLER_ADDRESS"));
 
-const disburser = privateKeyToAccount(requireEnv("PRIVATE_KEY") as `0x${string}`, {
+const disburser = privateKeyToAccount(ensureHex(requireEnv("DISBURSER_PRIVATE_KEY")), {
   nonceManager,
 });
 

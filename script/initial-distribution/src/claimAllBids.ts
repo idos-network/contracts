@@ -2,7 +2,7 @@
  * Claim all unclaimed CCA bids: exit any unexited bids, then claim tokens (batch per owner).
  *
  * Uses the same .env as the main initial-distribution script: CHAIN_ID, RPC_URL, CCA_ADDRESS,
- * and PRIVATE_KEY (or DISBURSER_PRIVATE_KEY) for sending transactions. Anyone can call
+ * and DISBURSER_PRIVATE_KEY for sending transactions. Anyone can call
  * exit/claim; tokens are sent to the bid owner.
  *
  * Usage: pnpm exec tsx src/claimAllBids.ts
@@ -38,7 +38,7 @@ const SUPPORTED_CHAINS = {
 const CHAIN_ID = requireEnv("CHAIN_ID");
 const RPC_URL = requireEnv("RPC_URL");
 const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
-const PRIVATE_KEY = ensureHex(process.env.PRIVATE_KEY ?? requireEnv("DISBURSER_PRIVATE_KEY"));
+const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
 
 const chain = SUPPORTED_CHAINS[CHAIN_ID];
 assertCondition(
@@ -54,7 +54,7 @@ const publicClient = createPublicClient({
 const walletClient = createWalletClient({
   chain,
   transport: http(RPC_URL),
-  account: privateKeyToAccount(PRIVATE_KEY),
+  account: privateKeyToAccount(DISBURSER_PRIVATE_KEY),
 });
 
 const ccaContract = getContract({
