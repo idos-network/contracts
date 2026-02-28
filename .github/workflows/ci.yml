@@ -36,24 +36,24 @@ jobs:
 
       - run: forge test --no-match-path '*.invariant.*'
 
-  cca-disburse:
+  initial-distribution:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: script/cca-disburse
+        working-directory: script/initial-distribution
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
-          package_json_file: script/cca-disburse/package.json
+          package_json_file: script/initial-distribution/package.json
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: script/cca-disburse/pnpm-lock.yaml
+          cache-dependency-path: script/initial-distribution/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 

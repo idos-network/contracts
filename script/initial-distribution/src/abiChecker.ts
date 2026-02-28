@@ -78,7 +78,7 @@ const ARTIFACTS = [
   ["ERC20.sol/ERC20.json", "ERC20"] as const,
 ] as const;
 
-const ABI_DRIFT_SUFFIX = "Update script/cca-disburse/src/abis.ts to match the contract.";
+const ABI_DRIFT_SUFFIX = "Update script/initial-distribution/src/abis.ts to match the contract.";
 
 export function assertAbisMatchArtifacts(abis: {
   ccaAbi: AbiEntry;

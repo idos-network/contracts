@@ -1,5 +1,5 @@
 {
-  "name": "cca-disburse",
+  "name": "initial-distribution",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "run": "tsx src/cca.ts",
+    "tde": "tsx src/tde.ts",
+    "cca": "tsx src/cca.ts",
     "claim-all-bids": "tsx src/claimAllBids.ts",
     "test": "tsx --test src/*.test.ts",
     "lint": "biome lint --write src",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@thesephist/tsqdm": "0.1.1",
+    "csv-parse": "^6.1.0",
     "dotenv": "^16.4.7",
     "viem": "^2.23.2"
   },

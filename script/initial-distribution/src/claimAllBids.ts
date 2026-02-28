@@ -1,7 +1,7 @@
 /**
  * Claim all unclaimed CCA bids: exit any unexited bids, then claim tokens (batch per owner).
  *
- * Uses the same .env as the main cca-disburse script: CHAIN_ID, RPC_URL, CCA_ADDRESS,
+ * Uses the same .env as the main initial-distribution script: CHAIN_ID, RPC_URL, CCA_ADDRESS,
  * and PRIVATE_KEY (or DISBURSER_PRIVATE_KEY) for sending transactions. Anyone can call
  * exit/claim; tokens are sent to the bid owner.
  *
