@@ -25,8 +25,13 @@ export type BatchCall = { target: Address; data: `0x${string}` };
 
 function isExecutionRevert(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return message.includes("execution reverted") || message.includes("exceeds block gas limit");
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes("execution reverted") ||
+    msg.includes("reverted") ||
+    msg.includes("exceeds block gas limit") ||
+    error.constructor.name === "ContractFunctionRevertedError"
+  );
 }
 
 export type BatchCallerConfig = {
