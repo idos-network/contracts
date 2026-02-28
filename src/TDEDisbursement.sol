@@ -26,14 +26,21 @@ contract TDEDisbursement {
     IERC20 public immutable IDOS_TOKEN;
     address public immutable DISBURSER;
 
-    mapping(address beneficiary => mapping(Modality modality => IDOSVesting vestingWallet)) public vestingContracts;
+    mapping(address beneficiary => mapping(Modality modality => IDOSVesting vestingWallet))
+        public vestingContracts;
 
-    event Disbursed(address indexed beneficiary, address transferTarget, uint256 amount, Modality modality);
+    event Disbursed(
+        address indexed beneficiary,
+        address transferTarget,
+        uint256 amount,
+        Modality modality
+    );
 
     error DirectIsNotVested();
     error UnknownModality(Modality modality);
     error ZeroAddressToken();
     error ZeroAddressDisburser();
+    error ZeroAddressBeneficiary();
     error OnlyCallableByDisburser();
 
     constructor(IERC20 idosToken, address disburser) {
@@ -53,11 +60,19 @@ contract TDEDisbursement {
         _;
     }
 
-    function disburse(address beneficiary, uint256 amount, Modality modality) external onlyDisburser {
+    function disburse(
+        address beneficiary,
+        uint256 amount,
+        Modality modality
+    ) external onlyDisburser {
+        if (beneficiary == address(0)) revert ZeroAddressBeneficiary();
         address transferTarget = beneficiary;
 
         if (modality != Modality.DIRECT) {
-            (IDOSVesting vestingContract,) = ensureVestingContractExists(beneficiary, modality);
+            (IDOSVesting vestingContract, ) = ensureVestingContractExists(
+                beneficiary,
+                modality
+            );
             transferTarget = address(vestingContract);
         }
 
@@ -66,31 +81,40 @@ contract TDEDisbursement {
         emit Disbursed(beneficiary, transferTarget, amount, modality);
     }
 
-    function ensureVestingContractExists(address beneficiary, Modality modality)
-        public
-        onlyDisburser
-        returns (IDOSVesting vestingContract, bool created)
-    {
+    function ensureVestingContractExists(
+        address beneficiary,
+        Modality modality
+    ) public onlyDisburser returns (IDOSVesting vestingContract, bool created) {
         created = false;
         vestingContract = vestingContracts[beneficiary][modality];
 
         if (address(vestingContract) == address(0)) {
-            (uint64 startTimestamp, uint64 durationSeconds, uint64 cliffSeconds) = VESTING_PARAMS_FOR_MODALITY(modality);
+            (
+                uint64 startTimestamp,
+                uint64 durationSeconds,
+                uint64 cliffSeconds
+            ) = VESTING_PARAMS_FOR_MODALITY(modality);
 
             created = true;
-            vestingContract = new IDOSVesting{salt: keccak256(abi.encode(beneficiary, modality))}(
-                beneficiary, startTimestamp, durationSeconds, cliffSeconds
-            );
+            vestingContract = new IDOSVesting{
+                salt: keccak256(abi.encode(beneficiary, modality))
+            }(beneficiary, startTimestamp, durationSeconds, cliffSeconds);
 
             vestingContracts[beneficiary][modality] = vestingContract;
         }
     }
 
     // forge-lint: disable-next-line(mixed-case-function): I want it to look like an immutable mapping.
-    function VESTING_PARAMS_FOR_MODALITY(Modality modality)
+    function VESTING_PARAMS_FOR_MODALITY(
+        Modality modality
+    )
         public
         pure
-        returns (uint64 startTimestamp, uint64 durationSeconds, uint64 cliffSeconds)
+        returns (
+            uint64 startTimestamp,
+            uint64 durationSeconds,
+            uint64 cliffSeconds
+        )
     {
         if (modality == Modality.DIRECT) revert DirectIsNotVested();
 
