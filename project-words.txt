@@ -3,6 +3,7 @@ disbursable
 EpochRewardDidntChange
 idOS
 IERC20
+MULTICALL
 reentrancy
 soldeer
 thesephist
