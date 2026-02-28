@@ -21,7 +21,6 @@ import {
   executeInGasFilledBatches,
 } from "./batch.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
-import { readVestingContracts } from "./vesting.js";
 
 // --- Config ---
 
@@ -30,8 +29,6 @@ function requireEnv(name: string): string {
   if (!value) throw new Error(`${name} not set`);
   return value;
 }
-
-const MULTICALL_CHUNK_SIZE = 200;
 
 const _srcDir = dirname(fileURLToPath(import.meta.url));
 const _repoRoot = join(_srcDir, "..", "..", "..");
@@ -105,60 +102,54 @@ async function ensureAllowance(totalNeeded: bigint): Promise<void> {
   console.error(`Approval confirmed: ${hash}`);
 }
 
-async function resolveTransferTargets(rows: DisbursementRow[]): Promise<Address[]> {
-  const vestingAddresses = await readVestingContracts(
-    publicClient,
-    TDE_DISBURSEMENT_ADDRESS,
-    tdeDisbursementAbi,
-    rows,
-    MULTICALL_CHUNK_SIZE,
-  );
-
-  return rows.map((row, i) => (row.modality !== 0 ? vestingAddresses[i] : row.address));
+function disbursementKey(beneficiary: Address, modality: number, amount: bigint): string {
+  return `${beneficiary}-${modality}-${amount}`;
 }
 
-async function readBalances(addresses: Address[]): Promise<bigint[]> {
-  const chunks = Array.from(
-    { length: Math.ceil(addresses.length / MULTICALL_CHUNK_SIZE) },
-    (_, i) => addresses.slice(i * MULTICALL_CHUNK_SIZE, (i + 1) * MULTICALL_CHUNK_SIZE),
-  );
+type DisbursedLog = { beneficiary: Address; modality: number; amount: bigint };
 
-  const chunkResults = await Promise.all(
-    chunks.map((chunk) =>
-      publicClient.multicall({
-        contracts: chunk.map((addr) => ({
-          address: tokenAddress,
-          abi: erc20Abi,
-          functionName: "balanceOf" as const,
-          args: [addr] as const,
-        })),
-      }),
-    ),
-  );
-
-  return chunkResults.flatMap((results) =>
-    results.map((r) => {
-      if (r.status === "failure") throw r.error;
-      return r.result as bigint;
-    }),
-  );
+async function readDisbursedLogs(): Promise<DisbursedLog[]> {
+  const logs = await publicClient.getContractEvents({
+    address: TDE_DISBURSEMENT_ADDRESS,
+    abi: tdeDisbursementAbi,
+    eventName: "Disbursed",
+    fromBlock: 0n,
+  });
+  return logs.map((log) => (log as unknown as { args: DisbursedLog }).args);
 }
 
-// `balances` is indexed against resolved `targets` (vesting contract addresses),
-// but `pending` is filtered from `rows` (beneficiary addresses). This is correct:
-// `disburse()` takes the beneficiary address, not the vesting contract.
+function findPendingRows(rows: DisbursementRow[], logs: DisbursedLog[]): DisbursementRow[] {
+  const counts = new Map<string, number>();
+  for (const log of logs) {
+    const key = disbursementKey(log.beneficiary, log.modality, log.amount);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const pending: DisbursementRow[] = [];
+  for (const row of rows) {
+    const key = disbursementKey(row.address, row.modality, row.amount);
+    const remaining = counts.get(key) ?? 0;
+    if (remaining > 0) {
+      counts.set(key, remaining - 1);
+    } else {
+      pending.push(row);
+    }
+  }
+  return pending;
+}
+
 async function disburseAll(rows: DisbursementRow[]): Promise<void> {
-  const targets = await resolveTransferTargets(rows);
-  const balances = await readBalances(targets);
-
-  const pending = rows.filter((row, i) => balances[i] < row.amount);
+  const logs = await readDisbursedLogs();
+  const pending = findPendingRows(rows, logs);
 
   if (pending.length === 0) {
-    console.error(`All ${rows.length} destinations already funded, nothing to do.`);
+    console.error(`All ${rows.length} disbursements already recorded on-chain, nothing to do.`);
     return;
   }
 
-  console.error(`${rows.length - pending.length} already funded, disbursing ${pending.length}...`);
+  console.error(
+    `${rows.length - pending.length} already disbursed (by event logs), disbursing ${pending.length}...`,
+  );
 
   const calls: BatchCall[] = pending.map(({ address, modality, amount }) => ({
     target: TDE_DISBURSEMENT_ADDRESS,
