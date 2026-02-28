@@ -138,19 +138,7 @@ function findPendingRows(rows: DisbursementRow[], logs: DisbursedLog[]): Disburs
   return pending;
 }
 
-async function disburseAll(rows: DisbursementRow[]): Promise<void> {
-  const logs = await readDisbursedLogs();
-  const pending = findPendingRows(rows, logs);
-
-  if (pending.length === 0) {
-    console.error(`All ${rows.length} disbursements already recorded on-chain, nothing to do.`);
-    return;
-  }
-
-  console.error(
-    `${rows.length - pending.length} already disbursed (by event logs), disbursing ${pending.length}...`,
-  );
-
+async function disburseAll(pending: DisbursementRow[]): Promise<void> {
   const calls: BatchCall[] = pending.map(({ address, modality, amount }) => ({
     target: TDE_DISBURSEMENT_ADDRESS,
     data: encodeFunctionData({
@@ -165,9 +153,19 @@ async function disburseAll(rows: DisbursementRow[]): Promise<void> {
 
 // --- Main ---
 
-const disbursementRows = loadDisbursementCsv("disbursement.csv");
+const allRows = loadDisbursementCsv("disbursement.csv");
+const logs = await readDisbursedLogs();
+const pendingRows = findPendingRows(allRows, logs);
 
-await ensureDelegation(batchConfig);
-await ensureAllowance(disbursementRows.reduce((sum, row) => sum + row.amount, 0n));
-await disburseAll(disbursementRows);
-await clearDelegation(batchConfig);
+if (pendingRows.length === 0) {
+  console.error(`All ${allRows.length} disbursements already recorded on-chain, nothing to do.`);
+} else {
+  console.error(
+    `${allRows.length - pendingRows.length} already disbursed (by event logs), disbursing ${pendingRows.length}...`,
+  );
+
+  await ensureDelegation(batchConfig);
+  await ensureAllowance(pendingRows.reduce((sum, row) => sum + row.amount, 0n));
+  await disburseAll(pendingRows);
+  await clearDelegation(batchConfig);
+}
