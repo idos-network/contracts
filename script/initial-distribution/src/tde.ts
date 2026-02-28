@@ -3,14 +3,13 @@ import {
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
-  erc20Abi,
   formatEther,
   getAddress,
   http,
 } from "viem";
 import { nonceManager, privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
-import { tdeDisbursementAbi } from "./abis.js";
+import { erc20Abi, tdeDisbursementAbi } from "./abis.js";
 import {
   type BatchCall,
   type BatchCallerConfig,
