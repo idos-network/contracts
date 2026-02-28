@@ -34,6 +34,7 @@ const _srcDir = dirname(fileURLToPath(import.meta.url));
 const _repoRoot = join(_srcDir, "..", "..", "..");
 
 const TDE_DISBURSEMENT_ADDRESS = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
+const TDE_DISBURSEMENT_DEPLOYMENT_BLOCK = BigInt(requireEnv("TDE_DISBURSEMENT_DEPLOYMENT_BLOCK"));
 
 const { abi: tdeDisbursementAbi } = JSON.parse(
   readFileSync(join(_repoRoot, "out/TDEDisbursement.sol/TDEDisbursement.json"), "utf8"),
@@ -108,14 +109,28 @@ function disbursementKey(beneficiary: Address, modality: number, amount: bigint)
 
 type DisbursedLog = { beneficiary: Address; modality: number; amount: bigint };
 
+const LOG_BLOCK_RANGE = 50_000n;
+
 async function readDisbursedLogs(): Promise<DisbursedLog[]> {
-  const logs = await publicClient.getContractEvents({
-    address: TDE_DISBURSEMENT_ADDRESS,
-    abi: tdeDisbursementAbi,
-    eventName: "Disbursed",
-    fromBlock: 0n,
-  });
-  return logs.map((log) => (log as unknown as { args: DisbursedLog }).args);
+  const latestBlock = await publicClient.getBlockNumber();
+  const allLogs: DisbursedLog[] = [];
+
+  for (let from = TDE_DISBURSEMENT_DEPLOYMENT_BLOCK; from <= latestBlock; from += LOG_BLOCK_RANGE) {
+    const to =
+      from + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : from + LOG_BLOCK_RANGE - 1n;
+    const logs = await publicClient.getContractEvents({
+      address: TDE_DISBURSEMENT_ADDRESS,
+      abi: tdeDisbursementAbi,
+      eventName: "Disbursed",
+      fromBlock: from,
+      toBlock: to,
+    });
+    for (const log of logs) {
+      allLogs.push((log as unknown as { args: DisbursedLog }).args);
+    }
+  }
+
+  return allLogs;
 }
 
 function findPendingRows(rows: DisbursementRow[], logs: DisbursedLog[]): DisbursementRow[] {
