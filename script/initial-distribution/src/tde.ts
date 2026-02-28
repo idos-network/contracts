@@ -19,7 +19,7 @@ import {
   executeInGasFilledBatches,
 } from "./batch.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
-import { ensureHex, requireEnv } from "./lib.js";
+import { ensureHex, paginatedGetEvents, requiredArgs, requireEnv } from "./lib.js";
 
 // --- Config ---
 
@@ -88,33 +88,10 @@ function disbursementKey(beneficiary: Address, modality: number, amount: bigint)
   return `${beneficiary}-${modality}-${amount}`;
 }
 
-type DisbursedLog = { beneficiary: Address; modality: number; amount: bigint };
-
-const LOG_BLOCK_RANGE = 50_000n;
-
-async function readDisbursedLogs(): Promise<DisbursedLog[]> {
-  const latestBlock = await publicClient.getBlockNumber();
-  const allLogs: DisbursedLog[] = [];
-
-  for (let from = TDE_DISBURSEMENT_DEPLOYMENT_BLOCK; from <= latestBlock; from += LOG_BLOCK_RANGE) {
-    const to =
-      from + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : from + LOG_BLOCK_RANGE - 1n;
-    const logs = await publicClient.getContractEvents({
-      address: TDE_DISBURSEMENT_ADDRESS,
-      abi: tdeDisbursementAbi,
-      eventName: "Disbursed",
-      fromBlock: from,
-      toBlock: to,
-    });
-    for (const log of logs) {
-      allLogs.push((log as unknown as { args: DisbursedLog }).args);
-    }
-  }
-
-  return allLogs;
-}
-
-function findPendingRows(rows: DisbursementRow[], logs: DisbursedLog[]): DisbursementRow[] {
+function findPendingRows(
+  rows: DisbursementRow[],
+  logs: { beneficiary: Address; modality: number; amount: bigint }[],
+): DisbursementRow[] {
   const counts = new Map<string, number>();
   for (const log of logs) {
     const key = disbursementKey(log.beneficiary, log.modality, log.amount);
@@ -150,7 +127,20 @@ async function disburseAll(pending: DisbursementRow[]): Promise<void> {
 // --- Main ---
 
 const allRows = loadDisbursementCsv("disbursement.csv");
-const logs = await readDisbursedLogs();
+const latestBlock = await publicClient.getBlockNumber();
+const logs = (
+  await paginatedGetEvents(
+    (r) =>
+      publicClient.getContractEvents({
+        address: TDE_DISBURSEMENT_ADDRESS,
+        abi: tdeDisbursementAbi,
+        eventName: "Disbursed",
+        ...r,
+      }),
+    TDE_DISBURSEMENT_DEPLOYMENT_BLOCK,
+    latestBlock,
+  )
+).map((l) => requiredArgs(l));
 const pendingRows = findPendingRows(allRows, logs);
 
 if (pendingRows.length === 0) {
