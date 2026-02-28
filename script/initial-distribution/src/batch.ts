@@ -1,5 +1,4 @@
 import {
-  type Abi,
   type Account,
   type Address,
   type Chain,
@@ -9,6 +8,7 @@ import {
   type WalletClient,
   zeroAddress,
 } from "viem";
+import { batchCallerAbi } from "./abis.js";
 
 const BLOCK_GAS_LIMIT = 32_000_000n;
 const GAS_BUFFER_FACTOR = 6n; // estimate + estimate/6 ≈ 17% buffer
@@ -37,7 +37,6 @@ function isExecutionRevert(error: unknown): boolean {
 export type BatchCallerConfig = {
   publicClient: PublicClient;
   walletClient: WalletClient<Transport, Chain, Account>;
-  batchCallerAbi: Abi;
   batchCallerAddress: Address;
 };
 
@@ -50,7 +49,7 @@ function isDelegatedTo(code: string | undefined, address: Address): boolean {
   );
 }
 
-function calldataSize(batchCallerAbi: Abi, calls: BatchCall[]): number {
+function calldataSize(calls: BatchCall[]): number {
   return (
     encodeFunctionData({
       abi: batchCallerAbi,
@@ -66,7 +65,7 @@ async function estimateBatchGas(config: BatchCallerConfig, calls: BatchCall[]): 
   const signer = config.walletClient.account.address;
   return config.publicClient.estimateContractGas({
     address: signer,
-    abi: config.batchCallerAbi,
+    abi: batchCallerAbi,
     functionName: "execute",
     args: [calls],
     account: signer,
@@ -97,7 +96,7 @@ async function findMaxBatchSize(
   if (remaining === 0) return 0;
 
   const singleCall = allCalls.slice(startIndex, startIndex + 1);
-  if (calldataSize(config.batchCallerAbi, singleCall) > MAX_CALLDATA_BYTES) {
+  if (calldataSize(singleCall) > MAX_CALLDATA_BYTES) {
     throw new Error(
       `Call at index ${startIndex} exceeds MAX_CALLDATA_BYTES (${MAX_CALLDATA_BYTES}) on its own`,
     );
@@ -115,7 +114,7 @@ async function findMaxBatchSize(
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
     const batch = allCalls.slice(startIndex, startIndex + mid);
-    if (calldataSize(config.batchCallerAbi, batch) > MAX_CALLDATA_BYTES) {
+    if (calldataSize(batch) > MAX_CALLDATA_BYTES) {
       hi = mid - 1;
       continue;
     }
@@ -137,7 +136,7 @@ async function executeBatch(config: BatchCallerConfig, calls: BatchCall[]): Prom
 
   const hash = await config.walletClient.writeContract({
     address: config.walletClient.account.address,
-    abi: config.batchCallerAbi,
+    abi: batchCallerAbi,
     functionName: "execute",
     args: [calls],
     gas,

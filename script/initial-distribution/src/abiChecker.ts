@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AbiEvent, AbiFunction } from "viem";
 import { toEventSignature, toFunctionSignature } from "viem";
@@ -76,7 +76,20 @@ const ARTIFACTS = [
   ["CCADisbursementTracker.sol/CCADisbursementTracker.json", "Tracker"] as const,
   ["WhaleDisburser.sol/WhaleDisburser.json", "WhaleDisburser"] as const,
   ["ERC20.sol/ERC20.json", "ERC20"] as const,
+  ["TDEDisbursement.sol/TDEDisbursement.json", "TDEDisbursement"] as const,
+  ["BatchCaller.sol/BatchCaller.json", "BatchCaller"] as const,
 ] as const;
+
+// Forge may produce `Contract.json` or versioned `Contract.0.8.26.json`.
+// Try the exact path first, then fall back to any versioned variant.
+function resolveArtifactPath(exactPath: string): string | null {
+  if (existsSync(exactPath)) return exactPath;
+  const dir = dirname(exactPath);
+  if (!existsSync(dir)) return null;
+  const base = basename(exactPath, ".json");
+  const candidate = readdirSync(dir).find((f) => f.startsWith(`${base}.`) && f.endsWith(".json"));
+  return candidate ? join(dir, candidate) : null;
+}
 
 const ABI_DRIFT_SUFFIX = "Update script/initial-distribution/src/abis.ts to match the contract.";
 
@@ -85,27 +98,37 @@ export function assertAbisMatchArtifacts(abis: {
   trackerAbi: AbiEntry;
   whaleDisburserAbi: AbiEntry;
   erc20Abi: AbiEntry;
+  tdeDisbursementAbi: AbiEntry;
+  batchCallerAbi: AbiEntry;
 }): void {
   const out = (path: string) => join(_repoRoot, "out", path);
-  type Label = (typeof ARTIFACTS)[number][1];
-  const abiByLabel: Record<Label, AbiEntry> = {
-    CCA: abis.ccaAbi,
-    Tracker: abis.trackerAbi,
-    WhaleDisburser: abis.whaleDisburserAbi,
-    ERC20: abis.erc20Abi,
-  };
-  const withFullPath = ARTIFACTS.map(([path, label]) => ({ fullPath: out(path), label }));
-  const [present, missing] = splitBy(withFullPath, (e) => existsSync(e.fullPath));
+  const resolved = ARTIFACTS.map(([path, label]) => ({
+    fullPath: resolveArtifactPath(out(path)),
+    label,
+  }));
+  const [present, missing] = splitBy(resolved, (e) => e.fullPath !== null);
   if (missing.length > 0)
     throw new Error(
       [
         "Missing artifact(s). Run `forge build` from the repo root.",
         "",
         "Missing:",
-        ...missing.map((e) => `- ${e.fullPath}`),
+        ...missing.map((e) => `- ${e.label}`),
       ].join("\n"),
     );
-  for (const { fullPath, label } of present) {
+
+  const abiByLabel = {
+    CCA: abis.ccaAbi,
+    Tracker: abis.trackerAbi,
+    WhaleDisburser: abis.whaleDisburserAbi,
+    ERC20: abis.erc20Abi,
+    TDEDisbursement: abis.tdeDisbursementAbi,
+    BatchCaller: abis.batchCallerAbi,
+  };
+  for (const entry of present) {
+    const { label } = entry;
+    // biome-ignore lint/style/noNonNullAssertion: It's checked above.
+    const fullPath = entry.fullPath!;
     const artifact = JSON.parse(readFileSync(fullPath, "utf-8"));
     try {
       checkAbiAgainstArtifact(abiByLabel[label], artifact);

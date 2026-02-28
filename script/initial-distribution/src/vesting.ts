@@ -1,4 +1,5 @@
-import { type Abi, type Address, type PublicClient, encodeFunctionData, zeroAddress } from "viem";
+import { type Address, type PublicClient, encodeFunctionData, zeroAddress } from "viem";
+import { tdeDisbursementAbi } from "./abis.js";
 import { type BatchCall, type BatchCallerConfig, executeInGasFilledBatches } from "./batch.js";
 import type { EVMModality } from "./modalities.js";
 
@@ -7,7 +8,6 @@ export type VestingEntry = { address: Address; modality: EVMModality };
 export async function readVestingContracts(
   publicClient: PublicClient,
   tdeDisbursementAddress: Address,
-  tdeDisbursementAbi: Abi,
   entries: VestingEntry[],
   chunkSize: number,
 ): Promise<Address[]> {
@@ -49,14 +49,12 @@ export async function readVestingContracts(
 export async function ensureVestingContracts(
   batchConfig: BatchCallerConfig,
   tdeDisbursementAddress: Address,
-  tdeDisbursementAbi: Abi,
   entries: VestingEntry[],
   chunkSize: number,
 ): Promise<void> {
   const existing = await readVestingContracts(
     batchConfig.publicClient,
     tdeDisbursementAddress,
-    tdeDisbursementAbi,
     entries,
     chunkSize,
   );

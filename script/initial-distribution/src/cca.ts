@@ -12,9 +12,9 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
-import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis";
-import { computeDisbursement } from "./computeDisbursement";
-import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter";
+import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis.js";
+import { computeDisbursement } from "./computeDisbursement.js";
+import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
 import {
   assertCondition,
   blockToTimestamp,
@@ -27,7 +27,7 @@ import {
   splitBy,
   sumOf,
   zip,
-} from "./lib";
+} from "./lib.js";
 
 const SUPPORTED_CHAINS = {
   [String(arbitrumSepolia.id)]: arbitrumSepolia,

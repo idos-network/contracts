@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   type Address,
   createPublicClient,
@@ -13,6 +10,7 @@ import {
 } from "viem";
 import { nonceManager, privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
+import { tdeDisbursementAbi } from "./abis.js";
 import {
   type BatchCall,
   type BatchCallerConfig,
@@ -21,28 +19,12 @@ import {
   executeInGasFilledBatches,
 } from "./batch.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
+import { requireEnv } from "./lib.js";
 
 // --- Config ---
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} not set`);
-  return value;
-}
-
-const _srcDir = dirname(fileURLToPath(import.meta.url));
-const _repoRoot = join(_srcDir, "..", "..", "..");
-
 const TDE_DISBURSEMENT_ADDRESS = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
 const TDE_DISBURSEMENT_DEPLOYMENT_BLOCK = BigInt(requireEnv("TDE_DISBURSEMENT_DEPLOYMENT_BLOCK"));
-
-const { abi: tdeDisbursementAbi } = JSON.parse(
-  readFileSync(join(_repoRoot, "out/TDEDisbursement.sol/TDEDisbursement.json"), "utf8"),
-);
-
-const { abi: batchCallerAbi } = JSON.parse(
-  readFileSync(join(_repoRoot, "out/BatchCaller.sol/BatchCaller.json"), "utf8"),
-);
 
 const BATCH_CALLER_ADDRESS = getAddress(requireEnv("BATCH_CALLER_ADDRESS"));
 
@@ -63,7 +45,6 @@ const walletClient = createWalletClient({
 const batchConfig: BatchCallerConfig = {
   publicClient,
   walletClient,
-  batchCallerAbi,
   batchCallerAddress: BATCH_CALLER_ADDRESS,
 };
 

@@ -19,7 +19,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
-import { ccaAbi } from "./abis";
+import { ccaAbi } from "./abis.js";
 import {
   assertCondition,
   contractHasCode,
@@ -27,7 +27,7 @@ import {
   paginatedGetEvents,
   requiredArgs,
   requireEnv,
-} from "./lib";
+} from "./lib.js";
 
 const SUPPORTED_CHAINS = {
   [String(arbitrumSepolia.id)]: arbitrumSepolia,

@@ -226,6 +226,79 @@ export const whaleDisburserAbi = [
   },
 ] as const;
 
+export const tdeDisbursementAbi = [
+  {
+    type: "event",
+    name: "Disbursed",
+    inputs: [
+      { name: "beneficiary", type: "address", indexed: true },
+      { name: "transferTarget", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "modality", type: "uint8", indexed: false },
+    ],
+  },
+  {
+    type: "function",
+    name: "IDOS_TOKEN",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "disburse",
+    inputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "modality", type: "uint8" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "vestingContracts",
+    inputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "modality", type: "uint8" },
+    ],
+    outputs: [{ name: "vestingWallet", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "ensureVestingContractExists",
+    inputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "modality", type: "uint8" },
+    ],
+    outputs: [
+      { name: "vestingContract", type: "address" },
+      { name: "created", type: "bool" },
+    ],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+export const batchCallerAbi = [
+  {
+    type: "function",
+    name: "execute",
+    inputs: [
+      {
+        name: "calls",
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
 export const erc20Abi = [
   {
     type: "event",
@@ -280,4 +353,6 @@ assertAbisMatchArtifacts({
   trackerAbi,
   whaleDisburserAbi,
   erc20Abi,
+  tdeDisbursementAbi,
+  batchCallerAbi,
 } as Parameters<typeof assertAbisMatchArtifacts>[0]);
