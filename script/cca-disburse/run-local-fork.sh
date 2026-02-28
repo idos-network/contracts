@@ -42,9 +42,11 @@ echo "Patching tracker at $TRACKER_ADDRESS so disburser is $PATCH_DISBURSER on A
 # 10000 ether in wei (same order as Anvil’s default per-account balance)
 cast rpc anvil_setBalance "[\"$PATCH_DISBURSER\", \"$(cast to-hex "$(cast to-wei 10_000 ether)")\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null
 
-# Deploy patch contract on Anvil (from disburser) and write its address to a file
-forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url "$LOCAL_RPC_URL" --broadcast --private-key "$DISBURSER_PRIVATE_KEY"
-PATCH_ADDR=$(cat patch-tracker-address.txt)
+# Deploy patch contract on Anvil (from disburser) and extract deployed address from output
+FORGE_LOG=$(mktemp)
+trap 'rm -f "$FORGE_LOG"' EXIT
+forge script script/cca-disburse/PatchTrackerDisburser.s.sol --rpc-url "$LOCAL_RPC_URL" --broadcast --private-key "$DISBURSER_PRIVATE_KEY" | tee "$FORGE_LOG"
+PATCH_ADDR=$(sed -n 's/.*Patch tracker deployed at: \(0x[0-9a-fA-F]*\).*/\1/p' "$FORGE_LOG")
 CODE=$(cast code "$PATCH_ADDR" --rpc-url "$LOCAL_RPC_URL")
 # Overwrite the existing tracker's bytecode with the patch (same logic, new disburser immutable)
 cast rpc anvil_setCode "[\"$TRACKER_ADDRESS\", \"$CODE\"]" --raw --rpc-url "$LOCAL_RPC_URL" >/dev/null

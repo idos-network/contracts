@@ -15,6 +15,3 @@
 
 # pnpm deploy output
 /bundle
-
-# Local fork patch script output
-patch-tracker-address.txt

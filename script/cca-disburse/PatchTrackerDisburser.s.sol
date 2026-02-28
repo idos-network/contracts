@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Deploys a CCADisbursementTracker with the same name/symbol/initialSupply as an existing
-// tracker but a new disburser, then writes the deployed address to patch-tracker-address.txt.
+// tracker but a new disburser, and logs the deployed address.
 // Used with a local Anvil fork so you can then anvil_setCode the tracker to this bytecode.
 pragma solidity 0.8.26;
 
@@ -21,7 +21,6 @@ contract PatchTrackerDisburser is Script {
         CCADisbursementTracker patch = new CCADisbursementTracker(name, symbol, initialSupply, patchDisburser);
         vm.stopBroadcast();
 
-        vm.writeFile("patch-tracker-address.txt", vm.toString(address(patch)));
         console.log("Patch tracker deployed at: %s", address(patch));
     }
 }
