@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "checkJs": false,
+    "maxNodeModuleDepth": 1
+  },
+  "exclude": ["node_modules", "out", "lib", "cache", "broadcast", "dependencies", "**/node_modules"]
+}

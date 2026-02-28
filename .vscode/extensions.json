@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "NomicFoundation.hardhat-solidity",
+    "tamasfe.even-better-toml"
+  ]
+}
