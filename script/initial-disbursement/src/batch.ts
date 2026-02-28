@@ -11,7 +11,8 @@ import {
 } from "viem";
 
 const BLOCK_GAS_LIMIT = 32_000_000n;
-const GAS_TARGET = (BLOCK_GAS_LIMIT * 90n) / 100n;
+const GAS_BUFFER_FACTOR = 6n; // estimate + estimate/6 ≈ 17% buffer
+const GAS_TARGET = (BLOCK_GAS_LIMIT * GAS_BUFFER_FACTOR) / (GAS_BUFFER_FACTOR + 1n);
 
 // RPC proxy rejects eth_sendRawTransaction somewhere between 45–95 KB of
 // calldata. 65 KB balances batch size against the proxy's limit.
@@ -127,7 +128,7 @@ async function findMaxBatchSize(
 
 async function executeBatch(config: BatchCallerConfig, calls: BatchCall[]): Promise<void> {
   const estimate = await estimateBatchGas(config, calls);
-  const gas = estimate + estimate / 5n; // 20% buffer
+  const gas = estimate + estimate / GAS_BUFFER_FACTOR;
 
   const hash = await config.walletClient.writeContract({
     address: config.walletClient.account.address,
