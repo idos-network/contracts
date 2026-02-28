@@ -95,14 +95,11 @@ contract TDEDisbursementTest is Test {
         _assertParams(Modality.VESTED_12_36, 1801839600, 94694400, 2419200);
     }
 
-    function _assertParams(
-        Modality modality,
-        uint64 expectedStart,
-        uint64 expectedDuration,
-        uint64 expectedCliff
-    ) internal view {
-        (uint64 start, uint64 duration, uint64 cliff) = tde
-            .VESTING_PARAMS_FOR_MODALITY(modality);
+    function _assertParams(Modality modality, uint64 expectedStart, uint64 expectedDuration, uint64 expectedCliff)
+        internal
+        view
+    {
+        (uint64 start, uint64 duration, uint64 cliff) = tde.VESTING_PARAMS_FOR_MODALITY(modality);
         assertEq(start, expectedStart);
         assertEq(duration, expectedDuration);
         assertEq(cliff, expectedCliff);
@@ -112,12 +109,7 @@ contract TDEDisbursementTest is Test {
         // Solidity 0.8.x panics (0x21) on out-of-range enum conversion at the
         // ABI decoding level, so we must use a raw call to observe the revert
         // as if it was called from inside the contract.
-        (bool success, ) = address(tde).call(
-            abi.encodeWithSelector(
-                tde.VESTING_PARAMS_FOR_MODALITY.selector,
-                uint8(10)
-            )
-        );
+        (bool success,) = address(tde).call(abi.encodeWithSelector(tde.VESTING_PARAMS_FOR_MODALITY.selector, uint8(10)));
         assertFalse(success);
     }
 
@@ -127,8 +119,7 @@ contract TDEDisbursementTest is Test {
 
     function test_EnsureCreatesNewContract() public {
         vm.prank(disburser);
-        (IDOSVesting vestingContract, bool created) = tde
-            .ensureVestingContractExists(alice, Modality.VESTED_0_12);
+        (IDOSVesting vestingContract, bool created) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
 
         assertTrue(created);
         assertTrue(address(vestingContract) != address(0));
@@ -136,17 +127,11 @@ contract TDEDisbursementTest is Test {
 
     function test_EnsureIsIdempotent() public {
         vm.prank(disburser);
-        (IDOSVesting first, bool created1) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting first, bool created1) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
         assertTrue(created1);
 
         vm.prank(disburser);
-        (IDOSVesting second, bool created2) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting second, bool created2) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
         assertFalse(created2);
 
         assertEq(address(first), address(second));
@@ -154,16 +139,10 @@ contract TDEDisbursementTest is Test {
 
     function test_EnsureDeploysCorrectVestingParams() public {
         vm.prank(disburser);
-        (IDOSVesting v, ) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting v,) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
 
-        (
-            uint64 expectedStart,
-            uint64 expectedDuration,
-            uint64 expectedCliff
-        ) = tde.VESTING_PARAMS_FOR_MODALITY(Modality.VESTED_0_12);
+        (uint64 expectedStart, uint64 expectedDuration, uint64 expectedCliff) =
+            tde.VESTING_PARAMS_FOR_MODALITY(Modality.VESTED_0_12);
 
         assertEq(v.owner(), alice);
         assertEq(v.start(), expectedStart);
@@ -173,47 +152,27 @@ contract TDEDisbursementTest is Test {
 
     function test_EnsureStoresInMapping() public {
         vm.prank(disburser);
-        (IDOSVesting v, ) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_1_6
-        );
+        (IDOSVesting v,) = tde.ensureVestingContractExists(alice, Modality.VESTED_1_6);
 
-        assertEq(
-            address(tde.vestingContracts(alice, Modality.VESTED_1_6)),
-            address(v)
-        );
+        assertEq(address(tde.vestingContracts(alice, Modality.VESTED_1_6)), address(v));
     }
 
     function test_DifferentBeneficiariesGetDifferentContracts() public {
         vm.prank(disburser);
-        (IDOSVesting vAlice, ) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting vAlice,) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
 
         vm.prank(disburser);
-        (IDOSVesting vBob, ) = tde.ensureVestingContractExists(
-            bob,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting vBob,) = tde.ensureVestingContractExists(bob, Modality.VESTED_0_12);
 
         assertTrue(address(vAlice) != address(vBob));
     }
 
-    function test_SameBeneficiaryDifferentModalitiesGetDifferentContracts()
-        public
-    {
+    function test_SameBeneficiaryDifferentModalitiesGetDifferentContracts() public {
         vm.prank(disburser);
-        (IDOSVesting v1, ) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_0_12
-        );
+        (IDOSVesting v1,) = tde.ensureVestingContractExists(alice, Modality.VESTED_0_12);
 
         vm.prank(disburser);
-        (IDOSVesting v2, ) = tde.ensureVestingContractExists(
-            alice,
-            Modality.VESTED_12_36
-        );
+        (IDOSVesting v2,) = tde.ensureVestingContractExists(alice, Modality.VESTED_12_36);
 
         assertTrue(address(v1) != address(v2));
     }
@@ -247,10 +206,7 @@ contract TDEDisbursementTest is Test {
         tde.disburse(alice, amount, Modality.DIRECT);
 
         assertEq(token.balanceOf(alice), amount);
-        assertEq(
-            address(tde.vestingContracts(alice, Modality.DIRECT)),
-            address(0)
-        );
+        assertEq(address(tde.vestingContracts(alice, Modality.DIRECT)), address(0));
     }
 
     function test_DisburseVestedCreatesContractAndTransfers() public {
@@ -259,9 +215,7 @@ contract TDEDisbursementTest is Test {
         vm.prank(disburser);
         tde.disburse(alice, amount, Modality.VESTED_0_12);
 
-        address vestingAddr = address(
-            tde.vestingContracts(alice, Modality.VESTED_0_12)
-        );
+        address vestingAddr = address(tde.vestingContracts(alice, Modality.VESTED_0_12));
         assertTrue(vestingAddr != address(0));
         assertEq(token.balanceOf(vestingAddr), amount);
         assertEq(token.balanceOf(alice), 0);
@@ -270,17 +224,12 @@ contract TDEDisbursementTest is Test {
     function test_DisburseVestedUsesExistingContract() public {
         vm.prank(disburser);
         tde.disburse(alice, 100 ether, Modality.VESTED_1_5);
-        address vestingAddr = address(
-            tde.vestingContracts(alice, Modality.VESTED_1_5)
-        );
+        address vestingAddr = address(tde.vestingContracts(alice, Modality.VESTED_1_5));
 
         vm.prank(disburser);
         tde.disburse(alice, 200 ether, Modality.VESTED_1_5);
 
-        assertEq(
-            address(tde.vestingContracts(alice, Modality.VESTED_1_5)),
-            vestingAddr
-        );
+        assertEq(address(tde.vestingContracts(alice, Modality.VESTED_1_5)), vestingAddr);
         assertEq(token.balanceOf(vestingAddr), 300 ether);
     }
 
@@ -298,18 +247,11 @@ contract TDEDisbursementTest is Test {
 
         vm.prank(disburser);
         tde.disburse(alice, amount, Modality.VESTED_0_12);
-        address vestingAddr = address(
-            tde.vestingContracts(alice, Modality.VESTED_0_12)
-        );
+        address vestingAddr = address(tde.vestingContracts(alice, Modality.VESTED_0_12));
 
         vm.prank(disburser);
         vm.expectEmit();
-        emit TDEDisbursement.Disbursed(
-            alice,
-            vestingAddr,
-            200 ether,
-            Modality.VESTED_0_12
-        );
+        emit TDEDisbursement.Disbursed(alice, vestingAddr, 200 ether, Modality.VESTED_0_12);
         tde.disburse(alice, 200 ether, Modality.VESTED_0_12);
     }
 
@@ -317,20 +259,10 @@ contract TDEDisbursementTest is Test {
         address noApproval = makeAddr("noApproval");
         token.mint(noApproval, 1000 ether);
 
-        TDEDisbursement tde2 = new TDEDisbursement(
-            IERC20(address(token)),
-            noApproval
-        );
+        TDEDisbursement tde2 = new TDEDisbursement(IERC20(address(token)), noApproval);
 
         vm.prank(noApproval);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IERC20Errors.ERC20InsufficientAllowance.selector,
-                tde2,
-                0,
-                100 ether
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, tde2, 0, 100 ether));
         tde2.disburse(alice, 100 ether, Modality.DIRECT);
     }
 
@@ -344,12 +276,9 @@ contract TDEDisbursementTest is Test {
         vm.prank(disburser);
         tde.disburse(alice, amount, Modality.VESTED_0_12);
 
-        IDOSVesting v = IDOSVesting(
-            payable(address(tde.vestingContracts(alice, Modality.VESTED_0_12)))
-        );
+        IDOSVesting v = IDOSVesting(payable(address(tde.vestingContracts(alice, Modality.VESTED_0_12))));
 
-        (uint64 startTs, uint64 durationSecs, uint64 cliffSecs) = tde
-            .VESTING_PARAMS_FOR_MODALITY(Modality.VESTED_0_12);
+        (uint64 startTs, uint64 durationSecs, uint64 cliffSecs) = tde.VESTING_PARAMS_FOR_MODALITY(Modality.VESTED_0_12);
 
         // Before start: nothing releasable.
         vm.warp(startTs - 1);
@@ -363,10 +292,7 @@ contract TDEDisbursementTest is Test {
         vm.warp(startTs + cliffSecs);
         uint256 atCliff = v.releasable(address(token));
         assertGt(atCliff, 0);
-        assertEq(
-            atCliff,
-            (amount * uint256(cliffSecs)) / uint256(durationSecs)
-        );
+        assertEq(atCliff, (amount * uint256(cliffSecs)) / uint256(durationSecs));
 
         // After full duration: everything releasable.
         vm.warp(startTs + durationSecs);
