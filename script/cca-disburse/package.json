@@ -10,10 +10,9 @@
     "run": "tsx src/cca.ts",
     "claim-all-bids": "tsx src/claimAllBids.ts",
     "test": "tsx --test src/*.test.ts",
-    "lint": "biome lint src",
+    "lint": "biome lint --write src",
     "format": "biome format --write src",
-    "check": "biome check src",
-    "check:fix": "biome check --write src"
+    "check": "biome check --write src"
   },
   "dependencies": {
     "@thesephist/tsqdm": "0.1.1",
