@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "run": "tsx src/index.ts"
+    "tde": "tsx src/tde.ts"
   },
   "packageManager": "pnpm@10.28.2",
   "dependencies": {

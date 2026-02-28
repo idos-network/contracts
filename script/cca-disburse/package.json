@@ -7,8 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "run": "tsx src/index.ts",
-    "dry-run": "tsx src/index.ts --dry-run",
+    "run": "tsx src/cca.ts",
+    "dry-run": "tsx src/cca.ts --dry-run",
     "claim-all-bids": "tsx src/claimAllBids.ts",
     "test": "tsx --test src/*.test.ts",
     "lint": "biome lint src",
