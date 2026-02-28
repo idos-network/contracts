@@ -37,9 +37,6 @@ const SUPPORTED_CHAINS = {
 
 // -- Configuration and sanity checks ──────────────────────────────────────────
 
-const DRY_RUN = process.argv.includes("--dry-run");
-if (DRY_RUN) console.log("[dry-run] Dry run enabled. No transactions will be broadcast.");
-
 const CHAIN_ID = requireEnv("CHAIN_ID");
 const RPC_URL = requireEnv("RPC_URL");
 const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
@@ -206,21 +203,11 @@ async function approveWhaleDisburser(amount: bigint): Promise<void> {
   ]);
   if (currentAllowance >= amount) return;
 
-  if (DRY_RUN) {
-    console.log(`[dry-run] approve WhaleDisburser for ${formatEther(amount)}`);
-    return;
-  }
   const hash = await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]);
   await publicClient.waitForTransactionReceipt({ hash });
 }
 
-const ZERO_HASH: Hex = "0x0000000000000000000000000000000000000000000000000000000000000000";
-
 async function executeWhaleDisburse(to: Address, amount: bigint): Promise<Hex> {
-  if (DRY_RUN) {
-    console.log(`[dry-run] WhaleDisburser.disburse(${to}, ${formatEther(amount)})`);
-    return ZERO_HASH;
-  }
   const hash = await whaleDisburserContract.write.disburse([
     SOLD_TOKEN_ADDRESS,
     to,
@@ -232,20 +219,12 @@ async function executeWhaleDisburse(to: Address, amount: bigint): Promise<Hex> {
 }
 
 async function executeTransfer(to: Address, amount: bigint): Promise<Hex> {
-  if (DRY_RUN) {
-    console.log(`[dry-run] transfer ${formatEther(amount)} to ${to}`);
-    return ZERO_HASH;
-  }
   const hash = await soldTokenContract.write.transfer([to, amount]);
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
 
 async function recordOnTracker(to: Address, ccaAmount: bigint, txHash: Hex): Promise<Hex> {
-  if (DRY_RUN) {
-    console.log(`[dry-run] record ${to} CCA ${formatEther(ccaAmount)}`);
-    return ZERO_HASH;
-  }
   const hash = await trackerContract.write.recordDisbursement([to, ccaAmount, txHash]);
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
@@ -256,8 +235,6 @@ async function findUnrecordedTransfer(
   fromBlock: bigint,
   toBlock: bigint,
 ): Promise<Hex | null> {
-  if (DRY_RUN) return null;
-
   if (entry.kind === "whale") {
     const logs = await whaleDisburserContract.getEvents.Disbursed(
       { beneficiary: entry.to },
@@ -417,37 +394,27 @@ if (remainingEntries.length > 0) {
 // ── Final state and sweep ────────────────────────────────────────────────────
 
 assertCondition(
-  DRY_RUN || (await trackerContract.read.saleFullyDisbursed()),
+  await trackerContract.read.saleFullyDisbursed(),
   "Sale is not fully disbursed. This should never happen.",
 );
 console.log(`✅ Sale is fully disbursed.`);
 
 const finalDisburserBalance = await soldTokenContract.read.balanceOf([disburser.address]);
 const sweepTarget = await ccaContract.read.tokensRecipient();
-if (!DRY_RUN) {
-  if (finalDisburserBalance > 0n) {
-    console.log(
-      `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
-    );
-    const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
-      account: disburser,
-    });
-    await publicClient.waitForTransactionReceipt({ hash: tx });
+if (finalDisburserBalance > 0n) {
+  console.log(
+    `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
+  );
+  const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
+    account: disburser,
+  });
+  await publicClient.waitForTransactionReceipt({ hash: tx });
 
-    assertCondition(
-      (await soldTokenContract.read.balanceOf([disburser.address])) === 0n,
-      `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
-    );
-  }
+  assertCondition(
+    (await soldTokenContract.read.balanceOf([disburser.address])) === 0n,
+    `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
+  );
   console.log(`✅ No remaining tokens on disburser.`);
-} else {
-  if (finalDisburserBalance > 0n) {
-    console.log(
-      `[dry-run] Would sweep remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget}`,
-    );
-  } else {
-    console.log(`✅ No remaining tokens on disburser.`);
-  }
 }
 
 console.log(`✅ Run completed successfully.`);
