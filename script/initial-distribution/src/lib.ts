@@ -83,6 +83,24 @@ export async function blockToTimestamp(
   return (await publicClient.getBlock({ blockNumber })).timestamp;
 }
 
+export async function findFirstBlockAtOrAfter(
+  targetTimestamp: bigint,
+  lo: bigint,
+  hi: bigint,
+  getTimestamp: (blockNumber: bigint) => Promise<bigint>,
+): Promise<bigint> {
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    const ts = await getTimestamp(mid);
+    if (ts >= targetTimestamp) {
+      hi = mid;
+    } else {
+      lo = mid + 1n;
+    }
+  }
+  return lo;
+}
+
 export async function contractHasCode(
   publicClient: PublicClient,
   contract: { address: Address },

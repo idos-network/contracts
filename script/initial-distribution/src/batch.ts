@@ -24,7 +24,7 @@ const NOOP_ADDRESS = "0x0000000000000000000000000000000000000001" as Address;
 
 export type BatchCall = { target: Address; data: `0x${string}` };
 
-function isExecutionRevert(error: unknown): boolean {
+export function isExecutionRevert(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const msg = error.message.toLowerCase();
   return (
@@ -43,7 +43,7 @@ export type BatchCallerConfig = {
 
 const EIP_7702_PREFIX = "0xef0100";
 
-function isDelegatedTo(code: string | undefined, address: Address): boolean {
+export function isDelegatedTo(code: string | undefined, address: Address): boolean {
   return (
     code?.startsWith(EIP_7702_PREFIX) === true &&
     code.slice(EIP_7702_PREFIX.length) === address.slice(2).toLowerCase()
