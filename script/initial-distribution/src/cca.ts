@@ -8,6 +8,7 @@ import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
 import {
   assertCondition,
   blockToTimestamp,
+  receiptFor,
   contractHasCode,
   ensureHex,
   iso8601ToTimestamp,
@@ -167,31 +168,33 @@ async function approveWhaleDisburser(amount: bigint): Promise<void> {
   ]);
   if (currentAllowance >= amount) return;
 
-  const hash = await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]);
-  await publicClient.waitForTransactionReceipt({ hash });
+  await receiptFor(
+    publicClient,
+    await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]),
+  );
 }
 
 async function executeWhaleDisburse(to: Address, amount: bigint): Promise<Hex> {
-  const hash = await whaleDisburserContract.write.disburse([
-    SOLD_TOKEN_ADDRESS,
-    to,
-    amount,
-    VESTING_START,
-  ]);
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
+  return (
+    await receiptFor(
+      publicClient,
+      await whaleDisburserContract.write.disburse([SOLD_TOKEN_ADDRESS, to, amount, VESTING_START]),
+    )
+  ).transactionHash;
 }
 
 async function executeTransfer(to: Address, amount: bigint): Promise<Hex> {
-  const hash = await soldTokenContract.write.transfer([to, amount]);
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
+  return (await receiptFor(publicClient, await soldTokenContract.write.transfer([to, amount])))
+    .transactionHash;
 }
 
 async function recordOnTracker(to: Address, ccaAmount: bigint, txHash: Hex): Promise<Hex> {
-  const hash = await trackerContract.write.recordDisbursement([to, ccaAmount, txHash]);
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
+  return (
+    await receiptFor(
+      publicClient,
+      await trackerContract.write.recordDisbursement([to, ccaAmount, txHash]),
+    )
+  ).transactionHash;
 }
 
 async function findUnrecordedTransfer(
@@ -369,10 +372,10 @@ if (finalDisburserBalance > 0n) {
   console.log(
     `🚧 Sweeping remaining balance (${formatEther(finalDisburserBalance)} tokens) to ${sweepTarget} ...`,
   );
-  const tx = await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance], {
-    account,
-  });
-  await publicClient.waitForTransactionReceipt({ hash: tx });
+  await receiptFor(
+    publicClient,
+    await soldTokenContract.write.transfer([sweepTarget, finalDisburserBalance]),
+  );
 
   assertCondition(
     (await soldTokenContract.read.balanceOf([account.address])) === 0n,

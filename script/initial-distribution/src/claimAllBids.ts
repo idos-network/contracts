@@ -14,6 +14,7 @@ import { ccaAbi } from "./abis.js";
 import { chainSetup } from "./chains.js";
 import {
   assertCondition,
+  receiptFor,
   contractHasCode,
   ensureHex,
   paginatedGetEvents,
@@ -111,8 +112,7 @@ async function main() {
 
     if (!exited) {
       try {
-        const hash = await ccaContract.write.exitBid([bidId]);
-        await publicClient.waitForTransactionReceipt({ hash });
+        await receiptFor(publicClient, await ccaContract.write.exitBid([bidId]));
         console.log(`Exited bid ${bidId}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -120,8 +120,10 @@ async function main() {
         if (!isCannotExitBid) throw e;
         // Partially filled: try exit at end (outbidBlock = 0) then outbid (outbidBlock = endBlock - 1)
         try {
-          const hash = await ccaContract.write.exitPartiallyFilledBid([bidId, ccaStartBlock, 0n]);
-          await publicClient.waitForTransactionReceipt({ hash });
+          await receiptFor(
+            publicClient,
+            await ccaContract.write.exitPartiallyFilledBid([bidId, ccaStartBlock, 0n]),
+          );
           console.log(`Exited bid ${bidId} (partially filled at end)`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -131,12 +133,10 @@ async function main() {
             msg.includes("CannotPartiallyExitBidBeforeEndBlock");
           if (!isPartiallyFilledAtEndRevert) throw err;
           const outbidBlock = ccaEndBlock > 0n ? ccaEndBlock - 1n : 0n;
-          const hash = await ccaContract.write.exitPartiallyFilledBid([
-            bidId,
-            ccaStartBlock,
-            outbidBlock,
-          ]);
-          await publicClient.waitForTransactionReceipt({ hash });
+          await receiptFor(
+            publicClient,
+            await ccaContract.write.exitPartiallyFilledBid([bidId, ccaStartBlock, outbidBlock]),
+          );
           console.log(`Exited bid ${bidId} (outbid)`);
         }
       }
@@ -153,12 +153,10 @@ async function main() {
   for (const [owner, bidIds] of byOwner) {
     if (bidIds.length === 1) {
       const singleId = bidIds[0] as bigint;
-      const hash = await ccaContract.write.claimTokens([singleId]);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await receiptFor(publicClient, await ccaContract.write.claimTokens([singleId]));
       console.log(`Claimed bid ${singleId} for ${owner}`);
     } else {
-      const hash = await ccaContract.write.claimTokensBatch([owner, bidIds]);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await receiptFor(publicClient, await ccaContract.write.claimTokensBatch([owner, bidIds]));
       console.log(`Claimed ${bidIds.length} bids for ${owner}`);
     }
   }
@@ -166,8 +164,7 @@ async function main() {
   // Sweep unsold tokens if not already done (required for tracker to consider sale fully claimed)
   const sweepBlock = await ccaContract.read.sweepUnsoldTokensBlock();
   if (sweepBlock === 0n) {
-    const hash = await ccaContract.write.sweepUnsoldTokens();
-    await publicClient.waitForTransactionReceipt({ hash });
+    await receiptFor(publicClient, await ccaContract.write.sweepUnsoldTokens());
     console.log("Swept unsold tokens.");
   } else {
     console.log("Tokens already swept (sweepUnsoldTokensBlock != 0).");

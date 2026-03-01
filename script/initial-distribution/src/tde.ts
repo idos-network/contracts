@@ -11,7 +11,7 @@ import {
 } from "./batch.js";
 import { chainSetup } from "./chains.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
-import { ensureHex, paginatedGetEvents, requiredArgs, requireEnv } from "./lib.js";
+import { receiptFor, ensureHex, paginatedGetEvents, requiredArgs, requireEnv } from "./lib.js";
 
 // --- Config ---
 
@@ -54,11 +54,10 @@ async function ensureAllowance(totalNeeded: bigint): Promise<void> {
 
   if (allowance >= totalNeeded) return;
 
-  console.error(`Approving TDEDisbursement to spend ${formatEther(totalNeeded)} tokens...`);
-  const hash = await tokenContract.write.approve([TDE_DISBURSEMENT_ADDRESS, totalNeeded]);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status === "reverted") throw new Error(`Approval reverted: ${hash}`);
-  console.error(`Approval confirmed: ${hash}`);
+  await receiptFor(
+    publicClient,
+    await tokenContract.write.approve([TDE_DISBURSEMENT_ADDRESS, totalNeeded]),
+  );
 }
 
 function disbursementKey(beneficiary: Address, modality: number, amount: bigint): string {

@@ -1,4 +1,4 @@
-import type { Address, Hex, PublicClient } from "viem";
+import type { Address, Hex, PublicClient, TransactionReceipt } from "viem";
 
 export function requireEnv(name: string): string {
   const value = process.env[name];
@@ -65,6 +65,15 @@ export function zip<A, B>(a: A[], b: B[]): [A, B][] {
     result.push([a[i], b[i]]);
   }
   return result;
+}
+
+export async function receiptFor(
+  publicClient: PublicClient,
+  hash: Hex,
+): Promise<TransactionReceipt> {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status === "reverted") throw new Error(`Transaction reverted: ${hash}`);
+  return receipt;
 }
 
 export async function blockToTimestamp(
