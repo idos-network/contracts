@@ -17,6 +17,8 @@ contract BatchCaller {
     error OnlyCallableBySelf();
     error CallFailed(uint256 index, bytes returnData);
 
+    receive() external payable {}
+
     function execute(Call[] calldata calls) external {
         if (msg.sender != address(this)) revert OnlyCallableBySelf();
 

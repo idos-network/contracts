@@ -80,4 +80,11 @@ contract BatchCallerTest is Test {
         vm.prank(address(batchCaller));
         batchCaller.execute(calls);
     }
+
+    function test_ReceiveEth() public {
+        vm.deal(address(this), 1 ether);
+        (bool ok,) = address(batchCaller).call{value: 1 ether}("");
+        assertTrue(ok);
+        assertEq(address(batchCaller).balance, 1 ether);
+    }
 }

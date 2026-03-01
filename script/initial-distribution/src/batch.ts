@@ -1,5 +1,4 @@
 import {
-  type Abi,
   type Account,
   type Address,
   type Chain,
@@ -9,6 +8,8 @@ import {
   type WalletClient,
   zeroAddress,
 } from "viem";
+import { batchCallerAbi } from "./abis.js";
+import { receiptFor } from "./lib.js";
 
 const BLOCK_GAS_LIMIT = 32_000_000n;
 const GAS_BUFFER_FACTOR = 6n; // estimate + estimate/6 ≈ 17% buffer
@@ -37,7 +38,6 @@ function isExecutionRevert(error: unknown): boolean {
 export type BatchCallerConfig = {
   publicClient: PublicClient;
   walletClient: WalletClient<Transport, Chain, Account>;
-  batchCallerAbi: Abi;
   batchCallerAddress: Address;
 };
 
@@ -50,7 +50,7 @@ function isDelegatedTo(code: string | undefined, address: Address): boolean {
   );
 }
 
-function calldataSize(batchCallerAbi: Abi, calls: BatchCall[]): number {
+function calldataSize(calls: BatchCall[]): number {
   return (
     encodeFunctionData({
       abi: batchCallerAbi,
@@ -66,7 +66,7 @@ async function estimateBatchGas(config: BatchCallerConfig, calls: BatchCall[]): 
   const signer = config.walletClient.account.address;
   return config.publicClient.estimateContractGas({
     address: signer,
-    abi: config.batchCallerAbi,
+    abi: batchCallerAbi,
     functionName: "execute",
     args: [calls],
     account: signer,
@@ -97,7 +97,7 @@ async function findMaxBatchSize(
   if (remaining === 0) return 0;
 
   const singleCall = allCalls.slice(startIndex, startIndex + 1);
-  if (calldataSize(config.batchCallerAbi, singleCall) > MAX_CALLDATA_BYTES) {
+  if (calldataSize(singleCall) > MAX_CALLDATA_BYTES) {
     throw new Error(
       `Call at index ${startIndex} exceeds MAX_CALLDATA_BYTES (${MAX_CALLDATA_BYTES}) on its own`,
     );
@@ -115,7 +115,7 @@ async function findMaxBatchSize(
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
     const batch = allCalls.slice(startIndex, startIndex + mid);
-    if (calldataSize(config.batchCallerAbi, batch) > MAX_CALLDATA_BYTES) {
+    if (calldataSize(batch) > MAX_CALLDATA_BYTES) {
       hi = mid - 1;
       continue;
     }
@@ -135,16 +135,16 @@ async function executeBatch(config: BatchCallerConfig, calls: BatchCall[]): Prom
   const estimate = await estimateBatchGas(config, calls);
   const gas = estimate + estimate / GAS_BUFFER_FACTOR;
 
-  const hash = await config.walletClient.writeContract({
-    address: config.walletClient.account.address,
-    abi: config.batchCallerAbi,
-    functionName: "execute",
-    args: [calls],
-    gas,
-  });
-
-  const receipt = await config.publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status === "reverted") throw new Error(`Batch transaction reverted: ${hash}`);
+  await receiptFor(
+    config.publicClient,
+    await config.walletClient.writeContract({
+      address: config.walletClient.account.address,
+      abi: batchCallerAbi,
+      functionName: "execute",
+      args: [calls],
+      gas,
+    }),
+  );
 }
 
 export async function executeInGasFilledBatches(
@@ -176,20 +176,19 @@ export async function ensureDelegation(config: BatchCallerConfig): Promise<void>
     executor: "self",
   });
 
-  const hash = await config.walletClient.sendTransaction({
-    to: NOOP_ADDRESS,
-    authorizationList: [authorization],
-    gas: 100_000n,
-  });
-
-  const receipt = await config.publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status === "reverted") throw new Error(`Delegation transaction reverted: ${hash}`);
+  await receiptFor(
+    config.publicClient,
+    await config.walletClient.sendTransaction({
+      to: NOOP_ADDRESS,
+      authorizationList: [authorization],
+      gas: 100_000n,
+    }),
+  );
 
   const postCode = await config.publicClient.getCode({ address: signer });
   if (!isDelegatedTo(postCode, config.batchCallerAddress)) {
     throw new Error(`Delegation not set after transaction (code: ${postCode})`);
   }
-  console.error(`Delegation confirmed: ${hash}`);
 }
 
 export async function clearDelegation(config: BatchCallerConfig): Promise<void> {
@@ -206,18 +205,17 @@ export async function clearDelegation(config: BatchCallerConfig): Promise<void> 
     executor: "self",
   });
 
-  const hash = await config.walletClient.sendTransaction({
-    to: NOOP_ADDRESS,
-    authorizationList: [authorization],
-    gas: 100_000n,
-  });
-
-  const receipt = await config.publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status === "reverted") throw new Error(`Clear delegation reverted: ${hash}`);
+  await receiptFor(
+    config.publicClient,
+    await config.walletClient.sendTransaction({
+      to: NOOP_ADDRESS,
+      authorizationList: [authorization],
+      gas: 100_000n,
+    }),
+  );
 
   const postCode = await config.publicClient.getCode({ address: signer });
   if (postCode && postCode !== "0x") {
     throw new Error(`Delegation still set after clearing (code: ${postCode})`);
   }
-  console.error(`Delegation cleared: ${hash}`);
 }

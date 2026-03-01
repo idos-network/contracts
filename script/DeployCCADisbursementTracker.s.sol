@@ -6,6 +6,7 @@ import {RecordingDeployer} from "./RecordingDeployer.s.sol";
 
 /// @notice Deployment script for CCADisbursementTracker.
 contract DeployCCADisbursementTracker is RecordingDeployer {
+    // forge-lint: disable-next-line(mixed-case-function): use the contract name as is.
     function deployCCADisbursementTracker(
         string memory name,
         string memory symbol,
