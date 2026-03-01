@@ -200,32 +200,6 @@ export const ccaAbi = [
   },
 ] as const;
 
-export const whaleDisburserAbi = [
-  {
-    type: "event",
-    name: "Disbursed",
-    inputs: [
-      { name: "beneficiary", type: "address", indexed: true },
-      { name: "totalAmount", type: "uint256", indexed: false },
-      { name: "immediateAmount", type: "uint256", indexed: false },
-      { name: "vestingWallet", type: "address", indexed: false },
-      { name: "vestedAmount", type: "uint256", indexed: false },
-    ],
-  },
-  {
-    type: "function",
-    name: "disburse",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "beneficiary", type: "address" },
-      { name: "totalAmount", type: "uint256" },
-      { name: "vestingStart", type: "uint64" },
-    ],
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "nonpayable",
-  },
-] as const;
-
 export const tdeDisbursementAbi = [
   {
     type: "event",
@@ -351,7 +325,6 @@ export const erc20Abi = [
 assertAbisMatchArtifacts({
   ccaAbi,
   trackerAbi,
-  whaleDisburserAbi,
   erc20Abi,
   tdeDisbursementAbi,
   batchCallerAbi,

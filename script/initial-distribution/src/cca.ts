@@ -1,7 +1,7 @@
 import { tqdm } from "@thesephist/tsqdm";
 import "dotenv/config";
 import { type Address, formatEther, getAddress, getContract, type Hex } from "viem";
-import { ccaAbi, erc20Abi, trackerAbi, whaleDisburserAbi } from "./abis.js";
+import { ccaAbi, erc20Abi, tdeDisbursementAbi, trackerAbi } from "./abis.js";
 import { chainSetup } from "./chains.js";
 import { computeDisbursement } from "./computeDisbursement.js";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
@@ -26,8 +26,7 @@ const CHAIN_ID = requireEnv("CHAIN_ID");
 const TRACKER_TOKEN_ADDRESS = getAddress(requireEnv("TRACKER_TOKEN_ADDRESS"));
 const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
 const SOLD_TOKEN_ADDRESS = getAddress(requireEnv("SOLD_TOKEN_ADDRESS"));
-const WHALE_DISBURSER_ADDRESS = getAddress(requireEnv("WHALE_DISBURSER_ADDRESS"));
-const VESTING_START = iso8601ToTimestamp(requireEnv("VESTING_START"));
+const TDE_DISBURSEMENT_ADDRESS = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
 const NORMAL_PHASE_START = iso8601ToTimestamp(requireEnv("NORMAL_PHASE_START"));
 const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
 const RPC_URL = requireEnv("RPC_URL");
@@ -50,9 +49,9 @@ const soldTokenContract = getContract({
   client: walletClient,
 });
 
-const whaleDisburserContract = getContract({
-  address: WHALE_DISBURSER_ADDRESS,
-  abi: whaleDisburserAbi,
+const tdeDisbursementContract = getContract({
+  address: TDE_DISBURSEMENT_ADDRESS,
+  abi: tdeDisbursementAbi,
   client: walletClient,
 });
 
@@ -62,7 +61,7 @@ const trackerContract = getContract({
   client: walletClient,
 });
 
-for (const contract of [ccaContract, trackerContract, soldTokenContract, whaleDisburserContract]) {
+for (const contract of [ccaContract, trackerContract, soldTokenContract, tdeDisbursementContract]) {
   assertCondition(
     await contractHasCode(publicClient, contract),
     `No contract code on address ${contract.address} on chain ${chain.id}.`,
@@ -161,24 +160,24 @@ const filledBids = tokensClaims.map((tc) => {
 
 // -- Execution functions ─────────────────────────────────────────────────────
 
-async function approveWhaleDisburser(amount: bigint): Promise<void> {
+async function ensureTdeAllowance(totalNeeded: bigint): Promise<void> {
   const currentAllowance = await soldTokenContract.read.allowance([
     account.address,
-    WHALE_DISBURSER_ADDRESS,
+    TDE_DISBURSEMENT_ADDRESS,
   ]);
-  if (currentAllowance >= amount) return;
+  if (currentAllowance >= totalNeeded) return;
 
   await receiptFor(
     publicClient,
-    await soldTokenContract.write.approve([WHALE_DISBURSER_ADDRESS, amount]),
+    await soldTokenContract.write.approve([TDE_DISBURSEMENT_ADDRESS, totalNeeded]),
   );
 }
 
-async function executeWhaleDisburse(to: Address, amount: bigint): Promise<Hex> {
+async function executeTdeDisburse(to: Address, amount: bigint, modality: number): Promise<Hex> {
   return (
     await receiptFor(
       publicClient,
-      await whaleDisburserContract.write.disburse([SOLD_TOKEN_ADDRESS, to, amount, VESTING_START]),
+      await tdeDisbursementContract.write.disburse([to, amount, modality]),
     )
   ).transactionHash;
 }
@@ -202,29 +201,35 @@ async function findUnrecordedTransfer(
   fromBlock: bigint,
   toBlock: bigint,
 ): Promise<Hex | null> {
-  if (entry.kind === "whale") {
-    const logs = await whaleDisburserContract.getEvents.Disbursed(
-      { beneficiary: entry.to },
-      { fromBlock, toBlock },
+  if (entry.kind === "tde") {
+    const logs = await publicClient.getContractEvents({
+      address: TDE_DISBURSEMENT_ADDRESS,
+      abi: tdeDisbursementAbi,
+      eventName: "Disbursed",
+      args: { beneficiary: entry.to },
+      fromBlock,
+      toBlock,
+    });
+    const match = logs.find(
+      (l) => l.args.amount === entry.transferAmount && l.args.modality === entry.modality,
     );
-    const match = logs.find((l) => l.args.totalAmount === entry.transferAmount);
-    if (!match) return null;
-    return match.transactionHash;
-  } else {
-    const logs = await soldTokenContract.getEvents.Transfer(
-      { from: account.address, to: entry.to },
-      { fromBlock, toBlock },
-    );
-    const match = logs.find((l) => l.args.value === entry.transferAmount);
     if (!match) return null;
     return match.transactionHash;
   }
+
+  const logs = await soldTokenContract.getEvents.Transfer(
+    { from: account.address, to: entry.to },
+    { fromBlock, toBlock },
+  );
+  const match = logs.find((l) => l.args.value === entry.transferAmount);
+  if (!match) return null;
+  return match.transactionHash;
 }
 
 function executeEntry(entry: DisbursementEntry): Promise<Hex> {
-  return entry.kind === "whale"
-    ? executeWhaleDisburse(entry.to, entry.transferAmount)
-    : executeTransfer(entry.to, entry.transferAmount);
+  if (entry.kind === "tde")
+    return executeTdeDisburse(entry.to, entry.transferAmount, entry.modality);
+  return executeTransfer(entry.to, entry.transferAmount);
 }
 
 // ── 2. Compute the full expected entry list ─────────────────────────────────
@@ -234,11 +239,15 @@ function executeEntry(entry: DisbursementEntry): Promise<Hex> {
 // for whale entries.
 
 interface DisbursementEntry {
-  kind: "normal" | "whale" | "sweep";
+  kind: "tde" | "sweep";
   to: Address;
   transferAmount: bigint;
   ccaAmount: bigint;
+  modality: number;
 }
+
+const MODALITY_DIRECT = 0;
+const MODALITY_VESTED_1_5 = 3;
 
 const expectedEntries: DisbursementEntry[] = [];
 
@@ -254,17 +263,30 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
   );
 
   if (r.ccaWhale > 0n) {
-    expectedEntries.push({
-      kind: "whale",
-      to: addr,
-      ccaAmount: r.ccaWhale,
-      transferAmount: r.disbursableWhale,
-    });
+    if (r.disbursableWhaleImmediate > 0n) {
+      expectedEntries.push({
+        kind: "tde",
+        modality: MODALITY_DIRECT,
+        to: addr,
+        ccaAmount: r.ccaWhaleImmediate,
+        transferAmount: r.disbursableWhaleImmediate,
+      });
+    }
+    if (r.disbursableWhaleVested > 0n) {
+      expectedEntries.push({
+        kind: "tde",
+        modality: MODALITY_VESTED_1_5,
+        to: addr,
+        ccaAmount: r.ccaWhaleVested,
+        transferAmount: r.disbursableWhaleVested,
+      });
+    }
   }
 
   if (r.ccaNormal > 0n) {
     expectedEntries.push({
-      kind: "normal",
+      kind: "tde",
+      modality: MODALITY_DIRECT,
       to: addr,
       ccaAmount: r.ccaNormal,
       transferAmount: r.disbursableNormal,
@@ -275,6 +297,7 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
 if (sweep.amount > 0n) {
   expectedEntries.push({
     kind: "sweep",
+    modality: MODALITY_DIRECT,
     to: sweep.recipient,
     ccaAmount: sweep.amount,
     transferAmount: sweep.amount,
@@ -344,10 +367,10 @@ if (remainingEntries.length > 0) {
   );
   console.log(`✅ Disburser has sufficient token balance.`);
 
-  const whaleTotal = sumOf(
-    remainingEntries.filter((e) => e.kind === "whale").map((e) => e.transferAmount),
+  const tdeTotal = sumOf(
+    remainingEntries.filter((e) => e.kind === "tde").map((e) => e.transferAmount),
   );
-  if (whaleTotal > 0n) await approveWhaleDisburser(whaleTotal);
+  if (tdeTotal > 0n) await ensureTdeAllowance(tdeTotal);
 
   for await (const entry of tqdm(remainingEntries, { label: "Disbursing" })) {
     const txHash = await executeEntry(entry);
