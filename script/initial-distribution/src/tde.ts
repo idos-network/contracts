@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { type Address, encodeFunctionData, formatEther, getAddress, getContract } from "viem";
+import { type Address, encodeFunctionData, getAddress, getContract } from "viem";
 import { nonceManager } from "viem/accounts";
 import { erc20Abi, tdeDisbursementAbi } from "./abis.js";
 import {
@@ -11,7 +11,7 @@ import {
 } from "./batch.js";
 import { chainSetup } from "./chains.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
-import { receiptFor, ensureHex, paginatedGetEvents, requiredArgs, requireEnv } from "./lib.js";
+import { ensureHex, paginatedGetEvents, receiptFor, requiredArgs, requireEnv } from "./lib.js";
 
 // --- Config ---
 

@@ -1,4 +1,4 @@
-import { type Address, type PublicClient, encodeFunctionData, zeroAddress } from "viem";
+import { type Address, encodeFunctionData, type PublicClient, zeroAddress } from "viem";
 import { tdeDisbursementAbi } from "./abis.js";
 import { type BatchCall, type BatchCallerConfig, executeInGasFilledBatches } from "./batch.js";
 import type { EVMModality } from "./modalities.js";

@@ -1,15 +1,14 @@
 import {
   type Chain,
-  Hex,
-  type LocalAccount,
-  type PublicClient,
   createPublicClient,
   createWalletClient,
+  type Hex,
   http,
+  type PublicClient,
 } from "viem";
+import { type PrivateKeyToAccountOptions, privateKeyToAccount } from "viem/accounts";
 import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
 import { assertCondition } from "./lib.js";
-import { privateKeyToAccount, PrivateKeyToAccountOptions } from "viem/accounts";
 
 const SUPPORTED_CHAINS: Record<string, Chain> = {
   [String(arbitrumSepolia.id)]: arbitrumSepolia,
