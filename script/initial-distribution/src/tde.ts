@@ -1,15 +1,6 @@
 import "dotenv/config";
-import {
-  type Address,
-  createPublicClient,
-  createWalletClient,
-  encodeFunctionData,
-  formatEther,
-  getAddress,
-  http,
-} from "viem";
-import { nonceManager, privateKeyToAccount } from "viem/accounts";
-import { arbitrumSepolia } from "viem/chains";
+import { type Address, encodeFunctionData, formatEther, getAddress } from "viem";
+import { nonceManager } from "viem/accounts";
 import { erc20Abi, tdeDisbursementAbi } from "./abis.js";
 import {
   type BatchCall,
@@ -18,29 +9,25 @@ import {
   ensureDelegation,
   executeInGasFilledBatches,
 } from "./batch.js";
+import { chainSetup } from "./chains.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
 import { ensureHex, paginatedGetEvents, requiredArgs, requireEnv } from "./lib.js";
 
 // --- Config ---
 
+const CHAIN_ID = requireEnv("CHAIN_ID");
 const TDE_DISBURSEMENT_ADDRESS = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
 const TDE_DISBURSEMENT_DEPLOYMENT_BLOCK = BigInt(requireEnv("TDE_DISBURSEMENT_DEPLOYMENT_BLOCK"));
-
 const BATCH_CALLER_ADDRESS = getAddress(requireEnv("BATCH_CALLER_ADDRESS"));
+const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+const RPC_URL = requireEnv("RPC_URL");
 
-const disburser = privateKeyToAccount(ensureHex(requireEnv("DISBURSER_PRIVATE_KEY")), {
-  nonceManager,
-});
-
-const chain = arbitrumSepolia;
-const transport = http(requireEnv("ARBITRUM_SEPOLIA_RPC_URL"));
-
-const publicClient = createPublicClient({ chain, transport });
-const walletClient = createWalletClient({
-  account: disburser,
-  chain,
-  transport,
-});
+const { account, publicClient, walletClient } = await chainSetup(
+  CHAIN_ID,
+  RPC_URL,
+  DISBURSER_PRIVATE_KEY,
+  { nonceManager },
+);
 
 const batchConfig: BatchCallerConfig = {
   publicClient,
@@ -61,7 +48,7 @@ async function ensureAllowance(totalNeeded: bigint): Promise<void> {
     address: tokenAddress,
     abi: erc20Abi,
     functionName: "allowance",
-    args: [disburser.address, TDE_DISBURSEMENT_ADDRESS],
+    args: [account.address, TDE_DISBURSEMENT_ADDRESS],
   });
 
   if (allowance >= totalNeeded) {
@@ -77,7 +64,6 @@ async function ensureAllowance(totalNeeded: bigint): Promise<void> {
     abi: erc20Abi,
     functionName: "approve",
     args: [TDE_DISBURSEMENT_ADDRESS, totalNeeded],
-    chain,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") throw new Error(`Approval reverted: ${hash}`);

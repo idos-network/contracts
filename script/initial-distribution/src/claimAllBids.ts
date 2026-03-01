@@ -9,17 +9,9 @@
  */
 
 import "dotenv/config";
-import {
-  type Address,
-  createPublicClient,
-  createWalletClient,
-  getAddress,
-  getContract,
-  http,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
+import { type Address, getAddress, getContract } from "viem";
 import { ccaAbi } from "./abis.js";
+import { chainSetup } from "./chains.js";
 import {
   assertCondition,
   contractHasCode,
@@ -29,33 +21,16 @@ import {
   requireEnv,
 } from "./lib.js";
 
-const SUPPORTED_CHAINS = {
-  [String(arbitrumSepolia.id)]: arbitrumSepolia,
-  [String(arbitrum.id)]: arbitrum,
-  [String(sepolia.id)]: sepolia,
-} as const;
-
-const CHAIN_ID = requireEnv("CHAIN_ID");
-const RPC_URL = requireEnv("RPC_URL");
 const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
+const CHAIN_ID = requireEnv("CHAIN_ID");
 const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+const RPC_URL = requireEnv("RPC_URL");
 
-const chain = SUPPORTED_CHAINS[CHAIN_ID];
-assertCondition(
-  chain !== undefined,
-  `Unsupported CHAIN_ID: ${CHAIN_ID}. Supported: ${Object.keys(SUPPORTED_CHAINS).join(", ")}`,
+const { chain, publicClient, walletClient } = await chainSetup(
+  CHAIN_ID,
+  RPC_URL,
+  DISBURSER_PRIVATE_KEY,
 );
-
-const publicClient = createPublicClient({
-  chain,
-  transport: http(RPC_URL),
-});
-
-const walletClient = createWalletClient({
-  chain,
-  transport: http(RPC_URL),
-  account: privateKeyToAccount(DISBURSER_PRIVATE_KEY),
-});
 
 const ccaContract = getContract({
   address: CCA_ADDRESS,
@@ -66,13 +41,6 @@ const ccaContract = getContract({
 type BidState = Awaited<ReturnType<typeof ccaContract.read.bids>>;
 
 async function main() {
-  const rpcChainId = await publicClient.getChainId();
-  assertCondition(
-    rpcChainId === chain.id,
-    `RPC_URL points to chain ${rpcChainId}, expected ${chain.id} (${chain.name}).`,
-  );
-  console.log(`✅ RPC connected to ${chain.name} (chain ${rpcChainId}).`);
-
   assertCondition(
     await contractHasCode(publicClient, ccaContract),
     `No contract at ${CCA_ADDRESS} on chain ${chain.id}.`,
