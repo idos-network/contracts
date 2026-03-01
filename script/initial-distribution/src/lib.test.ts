@@ -5,6 +5,7 @@ import {
   blockWindows,
   ensureHex,
   iso8601ToTimestamp,
+  paginatedGetEvents,
   requiredArgs,
   requireEnv,
   splitBy,
@@ -211,5 +212,41 @@ describe("blockWindows", () => {
       { fromBlock: 11n, toBlock: 21n },
       { fromBlock: 22n, toBlock: 22n },
     ]);
+  });
+});
+
+describe("paginatedGetEvents", () => {
+  function mockFetcher(results: Map<string, string[]>) {
+    return async (range: { fromBlock: bigint; toBlock: bigint }) => {
+      const key = `${range.fromBlock}-${range.toBlock}`;
+      return results.get(key) ?? [];
+    };
+  }
+
+  it("returns all results in a single page", async () => {
+    const results = new Map([["0-10000", ["a", "b"]]]);
+    const out = await paginatedGetEvents(mockFetcher(results), 0n, 10000n);
+    assert.deepEqual(out, ["a", "b"]);
+  });
+
+  it("concatenates results from multiple pages", async () => {
+    const results = new Map([
+      ["0-3", ["a"]],
+      ["4-7", ["b"]],
+      ["8-9", ["c"]],
+    ]);
+    const out = await paginatedGetEvents(mockFetcher(results), 0n, 9n, 3n);
+    assert.deepEqual(out, ["a", "b", "c"]);
+  });
+
+  it("returns empty array when fetcher returns nothing", async () => {
+    const out = await paginatedGetEvents(async () => [], 0n, 100n, 10n);
+    assert.deepEqual(out, []);
+  });
+
+  it("handles single-block range", async () => {
+    const results = new Map([["5-5", ["x"]]]);
+    const out = await paginatedGetEvents(mockFetcher(results), 5n, 5n);
+    assert.deepEqual(out, ["x"]);
   });
 });
