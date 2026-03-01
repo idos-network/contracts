@@ -2,9 +2,8 @@ import { tqdm } from "@thesephist/tsqdm";
 import "dotenv/config";
 import { type Address, formatEther, getAddress, getContract, type Hex } from "viem";
 import { ccaAbi, erc20Abi, tdeDisbursementAbi, trackerAbi } from "./abis.js";
+import { buildExpectedEntries, type DisbursementEntry } from "./ccaEntries.js";
 import { chainSetup } from "./chains.js";
-import { computeDisbursement } from "./computeDisbursement.js";
-import { EVMModality } from "./modalities.js";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
 import {
   assertCondition,
@@ -16,7 +15,6 @@ import {
   receiptFor,
   requiredArgs,
   requireEnv,
-  splitBy,
   sumOf,
   zip,
 } from "./lib.js";
@@ -234,72 +232,8 @@ function executeEntry(entry: DisbursementEntry): Promise<Hex> {
 }
 
 // ── 2. Compute the full expected entry list ─────────────────────────────────
-//
-// The tracker only sees pre-bonus CCA amounts. The actual token movements
-// include the bonus, so transferAmount intentionally differs from ccaAmount
-// for whale entries.
 
-interface DisbursementEntry {
-  kind: "tde" | "sweep";
-  to: Address;
-  transferAmount: bigint;
-  ccaAmount: bigint;
-  modality: EVMModality;
-}
-
-const expectedEntries: DisbursementEntry[] = [];
-
-for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
-  const [whaleBids, normalBids] = splitBy(
-    filledBids.filter((b) => b.owner === addr),
-    (b) => b.bidBlockNumber < phaseBoundaryBlock,
-  );
-
-  const r = computeDisbursement(
-    sumOf(whaleBids.map((b) => b.tokensFilled)),
-    sumOf(normalBids.map((b) => b.tokensFilled)),
-  );
-
-  if (r.disbursableWhaleImmediate > 0n) {
-    expectedEntries.push({
-      kind: "tde",
-      modality: EVMModality.DIRECT,
-      to: addr,
-      ccaAmount: r.ccaWhaleImmediate,
-      transferAmount: r.disbursableWhaleImmediate,
-    });
-  }
-
-  if (r.disbursableWhaleVested > 0n) {
-    expectedEntries.push({
-      kind: "tde",
-      modality: EVMModality.VESTED_1_5,
-      to: addr,
-      ccaAmount: r.ccaWhaleVested,
-      transferAmount: r.disbursableWhaleVested,
-    });
-  }
-
-  if (r.ccaNormal > 0n) {
-    expectedEntries.push({
-      kind: "tde",
-      modality: EVMModality.DIRECT,
-      to: addr,
-      ccaAmount: r.ccaNormal,
-      transferAmount: r.disbursableNormal,
-    });
-  }
-}
-
-if (sweep.amount > 0n) {
-  expectedEntries.push({
-    kind: "sweep",
-    modality: EVMModality.DIRECT,
-    to: sweep.recipient,
-    ccaAmount: sweep.amount,
-    transferAmount: sweep.amount,
-  });
-}
+const expectedEntries = buildExpectedEntries(filledBids, phaseBoundaryBlock, sweep);
 
 // ── 3. Reconcile on-chain tracker recordings against expected entries ────────
 //
