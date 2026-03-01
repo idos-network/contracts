@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { getAddress } from "viem";
 import { loadDisbursementCsv } from "./csv.js";
+import { EVMModality } from "./modalities.js";
 
 const VALID_ADDRESS = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa";
 
@@ -32,7 +33,7 @@ describe("loadDisbursementCsv", () => {
     const rows = loadDisbursementCsv(path);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].address, getAddress(VALID_ADDRESS));
-    assert.equal(rows[0].modality, 0); // DIRECT
+    assert.equal(rows[0].modality, EVMModality.DIRECT);
     assert.equal(rows[0].amount, 1000n);
   });
 
@@ -45,8 +46,8 @@ describe("loadDisbursementCsv", () => {
       ].join("\n"),
     );
     const rows = loadDisbursementCsv(path);
-    assert.equal(rows[0].modality, 1); // VESTED_0_12
-    assert.equal(rows[1].modality, 7); // VESTED_6_24
+    assert.equal(rows[0].modality, EVMModality.VESTED_0_12);
+    assert.equal(rows[1].modality, EVMModality.VESTED_6_24);
   });
 
   it("throws on unknown modality", () => {

@@ -1,5 +1,4 @@
 // Null means no vesting contract is needed.
-// The values aren't used anywhere. They're here just to cross-reference.
 export const MODALITIES = {
   "FCL Months 2-6": ["2026-03-05T15:00:00Z", "2026-04-05T15:00:00Z", "2026-08-05T15:00:00Z"],
   "SM - 0 - 12": ["2026-02-05T15:00:00Z", "2026-03-05T15:00:00Z", "2027-02-05T15:00:00Z"],

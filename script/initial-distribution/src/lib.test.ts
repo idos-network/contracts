@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   blockWindows,
   ensureHex,
+  findFirstBlockAtOrAfter,
   iso8601ToTimestamp,
   paginatedGetEvents,
   requiredArgs,
@@ -230,5 +231,93 @@ describe("paginatedGetEvents", () => {
     const out = await paginatedGetEvents(fetcher, 0n, 6n, 0n);
     assert.equal(maxInFlight, 5);
     assert.deepEqual(out, [0, 1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe("findFirstBlockAtOrAfter", () => {
+  function mockGetTimestamp(timestamps: Record<string, bigint>) {
+    return async (blockNumber: bigint) => {
+      const ts = timestamps[blockNumber.toString()];
+      if (ts === undefined) throw new Error(`No mock timestamp for block ${blockNumber}`);
+      return ts;
+    };
+  }
+
+  // Blocks 10..15 with timestamps 100, 110, 120, 130, 140, 150
+  const BLOCKS: Record<string, bigint> = {
+    "10": 100n,
+    "11": 110n,
+    "12": 120n,
+    "13": 130n,
+    "14": 140n,
+    "15": 150n,
+  };
+
+  it("returns the exact block when target matches a block timestamp", async () => {
+    const result = await findFirstBlockAtOrAfter(120n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 12n);
+  });
+
+  it("returns the next block when target falls between two timestamps", async () => {
+    const result = await findFirstBlockAtOrAfter(115n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 12n);
+  });
+
+  it("returns lo when target is at or before the first block", async () => {
+    const result = await findFirstBlockAtOrAfter(100n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 10n);
+  });
+
+  it("returns lo when target is before all blocks", async () => {
+    const result = await findFirstBlockAtOrAfter(50n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 10n);
+  });
+
+  it("returns hi when target matches the last block", async () => {
+    const result = await findFirstBlockAtOrAfter(150n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 15n);
+  });
+
+  it("returns hi when target is between second-to-last and last", async () => {
+    const result = await findFirstBlockAtOrAfter(145n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 15n);
+  });
+
+  it("returns lo when lo == hi (single block range)", async () => {
+    const result = await findFirstBlockAtOrAfter(120n, 12n, 12n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 12n);
+  });
+
+  it("works with a two-block range, target at first", async () => {
+    const result = await findFirstBlockAtOrAfter(100n, 10n, 11n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 10n);
+  });
+
+  it("works with a two-block range, target at second", async () => {
+    const result = await findFirstBlockAtOrAfter(110n, 10n, 11n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 11n);
+  });
+
+  it("works with a two-block range, target between them", async () => {
+    const result = await findFirstBlockAtOrAfter(105n, 10n, 11n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 11n);
+  });
+
+  it("handles non-uniform timestamp gaps", async () => {
+    const irregular: Record<string, bigint> = {
+      "0": 10n,
+      "1": 11n,
+      "2": 12n,
+      "3": 50n,
+      "4": 51n,
+      "5": 100n,
+    };
+    const result = await findFirstBlockAtOrAfter(30n, 0n, 5n, mockGetTimestamp(irregular));
+    assert.equal(result, 3n);
+  });
+
+  it("handles target past all blocks (returns hi)", async () => {
+    const result = await findFirstBlockAtOrAfter(200n, 10n, 15n, mockGetTimestamp(BLOCKS));
+    assert.equal(result, 15n);
   });
 });

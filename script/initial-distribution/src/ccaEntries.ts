@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 import { computeDisbursement } from "./computeDisbursement.js";
-import { EVMModality } from "./modalities.js";
 import { splitBy, sumOf } from "./lib.js";
+import { EVMModality } from "./modalities.js";
 
 export interface DisbursementEntry {
   kind: "tde" | "sweep";

@@ -4,12 +4,12 @@ import { type Address, formatEther, getAddress, getContract, type Hex } from "vi
 import { ccaAbi, erc20Abi, tdeDisbursementAbi, trackerAbi } from "./abis.js";
 import { buildExpectedEntries, type DisbursementEntry } from "./ccaEntries.js";
 import { chainSetup } from "./chains.js";
-import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
 import {
   assertCondition,
   blockToTimestamp,
   contractHasCode,
   ensureHex,
+  findFirstBlockAtOrAfter,
   iso8601ToTimestamp,
   paginatedGetEvents,
   receiptFor,

@@ -105,7 +105,11 @@ export function assertAbisMatchArtifacts(abis: {
     label,
   }));
   const [present, missing] = splitBy(resolved, (e) => e.fullPath !== null);
-  if (missing.length > 0)
+  if (missing.length > 0) {
+    // CI jobs that don't run `forge build` have zero artifacts; skip rather than
+    // fail so test-only jobs pass. If CI gains a Forge step, remove this guard
+    // so ABI drift is always caught.
+    if (process.env.CI && present.length === 0) return;
     throw new Error(
       [
         "Missing artifact(s). Run `forge build` from the repo root.",
@@ -114,6 +118,7 @@ export function assertAbisMatchArtifacts(abis: {
         ...missing.map((e) => `- ${e.label}`),
       ].join("\n"),
     );
+  }
 
   const abiByLabel = {
     CCA: abis.ccaAbi,

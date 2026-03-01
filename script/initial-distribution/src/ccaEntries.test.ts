@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Address } from "viem";
-import { EVMModality } from "./modalities.js";
 import { buildExpectedEntries, type FilledBid, type Sweep } from "./ccaEntries.js";
+import { EVMModality } from "./modalities.js";
 
 const ADDR_A = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as Address;
 const ADDR_B = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB" as Address;
@@ -100,6 +100,31 @@ describe("buildExpectedEntries", () => {
 
     assert.equal(entries.length, 1);
     assert.equal(entries[0].kind, "sweep");
+  });
+
+  it("bid at exact boundary block is classified as normal (not whale)", () => {
+    const boundaryBid: FilledBid = { owner: ADDR_A, bidBlockNumber: BOUNDARY, tokensFilled: 500n };
+    const entries = buildExpectedEntries([boundaryBid], BOUNDARY, null);
+
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].modality, EVMModality.DIRECT);
+    assert.equal(entries[0].transferAmount, 500n);
+  });
+
+  it("multiple whale bids from same owner are summed before computing disbursement", () => {
+    const singleEntry = buildExpectedEntries([whaleBid(ADDR_A, 600n)], BOUNDARY, null);
+    const multiEntry = buildExpectedEntries(
+      [whaleBid(ADDR_A, 300n), whaleBid(ADDR_A, 300n)],
+      BOUNDARY,
+      null,
+    );
+
+    assert.equal(singleEntry.length, multiEntry.length);
+    for (let i = 0; i < singleEntry.length; i++) {
+      assert.equal(singleEntry[i].transferAmount, multiEntry[i].transferAmount);
+      assert.equal(singleEntry[i].ccaAmount, multiEntry[i].ccaAmount);
+      assert.equal(singleEntry[i].modality, multiEntry[i].modality);
+    }
   });
 
   it("empty filledBids with no sweep produces empty array", () => {

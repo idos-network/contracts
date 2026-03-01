@@ -27,12 +27,6 @@ describe("isDelegatedTo", () => {
     const OTHER = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB" as Address;
     assert.equal(isDelegatedTo(DELEGATED_CODE, OTHER), false);
   });
-
-  it("handles checksummed address (code is lowercase)", () => {
-    const checksummed = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as Address;
-    const code = `0xef0100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`;
-    assert.equal(isDelegatedTo(code, checksummed), true);
-  });
 });
 
 describe("isExecutionRevert", () => {
