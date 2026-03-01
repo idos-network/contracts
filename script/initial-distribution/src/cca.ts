@@ -4,6 +4,7 @@ import { type Address, formatEther, getAddress, getContract, type Hex } from "vi
 import { ccaAbi, erc20Abi, tdeDisbursementAbi, trackerAbi } from "./abis.js";
 import { chainSetup } from "./chains.js";
 import { computeDisbursement } from "./computeDisbursement.js";
+import { EVMModality } from "./modalities.js";
 import { findFirstBlockAtOrAfter } from "./findFirstBlockAtOrAfter.js";
 import {
   assertCondition,
@@ -243,11 +244,8 @@ interface DisbursementEntry {
   to: Address;
   transferAmount: bigint;
   ccaAmount: bigint;
-  modality: number;
+  modality: EVMModality;
 }
-
-const MODALITY_DIRECT = 0;
-const MODALITY_VESTED_1_5 = 3;
 
 const expectedEntries: DisbursementEntry[] = [];
 
@@ -266,7 +264,7 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
     if (r.disbursableWhaleImmediate > 0n) {
       expectedEntries.push({
         kind: "tde",
-        modality: MODALITY_DIRECT,
+        modality: EVMModality.DIRECT,
         to: addr,
         ccaAmount: r.ccaWhaleImmediate,
         transferAmount: r.disbursableWhaleImmediate,
@@ -275,7 +273,7 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
     if (r.disbursableWhaleVested > 0n) {
       expectedEntries.push({
         kind: "tde",
-        modality: MODALITY_VESTED_1_5,
+        modality: EVMModality.VESTED_1_5,
         to: addr,
         ccaAmount: r.ccaWhaleVested,
         transferAmount: r.disbursableWhaleVested,
@@ -286,7 +284,7 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
   if (r.ccaNormal > 0n) {
     expectedEntries.push({
       kind: "tde",
-      modality: MODALITY_DIRECT,
+      modality: EVMModality.DIRECT,
       to: addr,
       ccaAmount: r.ccaNormal,
       transferAmount: r.disbursableNormal,
@@ -297,7 +295,7 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
 if (sweep.amount > 0n) {
   expectedEntries.push({
     kind: "sweep",
-    modality: MODALITY_DIRECT,
+    modality: EVMModality.DIRECT,
     to: sweep.recipient,
     ccaAmount: sweep.amount,
     transferAmount: sweep.amount,

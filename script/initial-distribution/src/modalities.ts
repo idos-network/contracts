@@ -18,20 +18,20 @@ const MODALITIES = {
 } as const;
 export type Modality = keyof typeof MODALITIES;
 
-// Made it an int-indexed object instead of a list to make mistakes obvious.
-const EVM_MODALITIES = {
-  0: "DIRECT",
-  1: "VESTED_0_12",
-  2: "VESTED_0_120",
-  3: "VESTED_1_5",
-  4: "VESTED_1_6",
-  5: "VESTED_1_60",
-  6: "VESTED_6_12",
-  7: "VESTED_6_24",
-  8: "VESTED_12_24",
-  9: "VESTED_12_36",
+// Mirrors the Solidity `enum Modality` in TDEDisbursement.sol.
+export const EVMModality = {
+  DIRECT: 0,
+  VESTED_0_12: 1,
+  VESTED_0_120: 2,
+  VESTED_1_5: 3,
+  VESTED_1_6: 4,
+  VESTED_1_60: 5,
+  VESTED_6_12: 6,
+  VESTED_6_24: 7,
+  VESTED_12_24: 8,
+  VESTED_12_36: 9,
 } as const;
-export type EVMModality = keyof typeof EVM_MODALITIES;
+export type EVMModality = (typeof EVMModality)[keyof typeof EVMModality];
 
 export const MODALITIES_TS_TO_EVM: Record<Modality, EVMModality> = {
   "FCL Months 2-6": 3,
