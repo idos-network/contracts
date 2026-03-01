@@ -15,7 +15,7 @@ type AbiEntry = ReadonlyArray<{
   readonly outputs?: ReadonlyArray<unknown>;
 }>;
 
-function abiItemSignature(item: {
+export function abiItemSignature(item: {
   type: string;
   name?: string;
   inputs?: unknown[];
@@ -26,7 +26,7 @@ function abiItemSignature(item: {
   return JSON.stringify(item);
 }
 
-function checkAbiAgainstArtifact(
+export function checkAbiAgainstArtifact(
   staticAbi: AbiEntry,
   artifact: {
     abi: readonly { type: string; name?: string; inputs?: unknown[]; outputs?: unknown[] }[];
