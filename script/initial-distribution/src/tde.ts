@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { type Address, encodeFunctionData, formatEther, getAddress } from "viem";
+import { type Address, encodeFunctionData, formatEther, getAddress, getContract } from "viem";
 import { nonceManager } from "viem/accounts";
 import { erc20Abi, tdeDisbursementAbi } from "./abis.js";
 import {
@@ -35,36 +35,27 @@ const batchConfig: BatchCallerConfig = {
   batchCallerAddress: BATCH_CALLER_ADDRESS,
 };
 
-const tokenAddress = (await publicClient.readContract({
+const tdeDisbursementContract = getContract({
   address: TDE_DISBURSEMENT_ADDRESS,
   abi: tdeDisbursementAbi,
-  functionName: "IDOS_TOKEN",
-})) as Address;
+  client: walletClient,
+});
+
+const tokenContract = getContract({
+  address: await tdeDisbursementContract.read.IDOS_TOKEN(),
+  abi: erc20Abi,
+  client: walletClient,
+});
 
 // --- Helpers ---
 
 async function ensureAllowance(totalNeeded: bigint): Promise<void> {
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account.address, TDE_DISBURSEMENT_ADDRESS],
-  });
+  const allowance = await tokenContract.read.allowance([account.address, TDE_DISBURSEMENT_ADDRESS]);
 
-  if (allowance >= totalNeeded) {
-    console.error(
-      `Allowance sufficient (${formatEther(allowance)} >= ${formatEther(totalNeeded)}), skipping approval.`,
-    );
-    return;
-  }
+  if (allowance >= totalNeeded) return;
 
   console.error(`Approving TDEDisbursement to spend ${formatEther(totalNeeded)} tokens...`);
-  const hash = await walletClient.writeContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [TDE_DISBURSEMENT_ADDRESS, totalNeeded],
-  });
+  const hash = await tokenContract.write.approve([TDE_DISBURSEMENT_ADDRESS, totalNeeded]);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") throw new Error(`Approval reverted: ${hash}`);
   console.error(`Approval confirmed: ${hash}`);
