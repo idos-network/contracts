@@ -1,13 +1,13 @@
 export const BPS_BASE = 100_00n; // 100.00%
 export const WHALE_BONUS_BPS = 20_00n; // 20.00% bonus
+const WHALE_BONUS_MULTIPLIER = BPS_BASE + WHALE_BONUS_BPS; // 120.00%
 
 export interface BidderDisbursement {
-  ccaWhale: bigint;
   ccaWhaleImmediate: bigint;
   ccaWhaleVested: bigint;
-  ccaNormal: bigint;
   disbursableWhaleImmediate: bigint;
   disbursableWhaleVested: bigint;
+  ccaNormal: bigint;
   disbursableNormal: bigint;
 }
 
@@ -21,18 +21,19 @@ export interface BidderDisbursement {
  * WhaleDisburser used to do on-chain.
  */
 export function computeDisbursement(ccaWhale: bigint, ccaNormal: bigint): BidderDisbursement {
-  const bonusMultiplier = BPS_BASE + WHALE_BONUS_BPS;
-  const disbursableWhale = (ccaWhale * bonusMultiplier) / BPS_BASE;
-  const disbursableWhaleImmediate = disbursableWhale / 6n;
   const ccaWhaleImmediate = ccaWhale / 6n;
+  const ccaWhaleVested = ccaWhale - ccaWhaleImmediate;
+
+  const disbursableWhale = (ccaWhale * WHALE_BONUS_MULTIPLIER) / BPS_BASE;
+  const disbursableWhaleImmediate = disbursableWhale / 6n;
+  const disbursableWhaleVested = disbursableWhale - disbursableWhaleImmediate;
 
   return {
-    ccaWhale,
     ccaWhaleImmediate,
-    ccaWhaleVested: ccaWhale - ccaWhaleImmediate,
+    ccaWhaleVested,
     ccaNormal,
     disbursableWhaleImmediate,
-    disbursableWhaleVested: disbursableWhale - disbursableWhaleImmediate,
+    disbursableWhaleVested,
     disbursableNormal: ccaNormal,
   };
 }

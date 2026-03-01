@@ -260,25 +260,24 @@ for (const addr of [...new Set(filledBids.map((b) => b.owner))].sort()) {
     sumOf(normalBids.map((b) => b.tokensFilled)),
   );
 
-  if (r.ccaWhale > 0n) {
-    if (r.disbursableWhaleImmediate > 0n) {
-      expectedEntries.push({
-        kind: "tde",
-        modality: EVMModality.DIRECT,
-        to: addr,
-        ccaAmount: r.ccaWhaleImmediate,
-        transferAmount: r.disbursableWhaleImmediate,
-      });
-    }
-    if (r.disbursableWhaleVested > 0n) {
-      expectedEntries.push({
-        kind: "tde",
-        modality: EVMModality.VESTED_1_5,
-        to: addr,
-        ccaAmount: r.ccaWhaleVested,
-        transferAmount: r.disbursableWhaleVested,
-      });
-    }
+  if (r.disbursableWhaleImmediate > 0n) {
+    expectedEntries.push({
+      kind: "tde",
+      modality: EVMModality.DIRECT,
+      to: addr,
+      ccaAmount: r.ccaWhaleImmediate,
+      transferAmount: r.disbursableWhaleImmediate,
+    });
+  }
+
+  if (r.disbursableWhaleVested > 0n) {
+    expectedEntries.push({
+      kind: "tde",
+      modality: EVMModality.VESTED_1_5,
+      to: addr,
+      ccaAmount: r.ccaWhaleVested,
+      transferAmount: r.disbursableWhaleVested,
+    });
   }
 
   if (r.ccaNormal > 0n) {
