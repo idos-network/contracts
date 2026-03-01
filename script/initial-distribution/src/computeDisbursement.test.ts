@@ -13,8 +13,16 @@ describe("computeDisbursement", () => {
       assert.equal(r.ccaNormal, 100n * e18);
     });
 
-    it("applies 20% bonus to whale disbursable amount", () => {
-      assert.equal(r.disbursableWhale, 480n * e18);
+    it("applies 20% bonus and splits whale into 1/6 immediate and 5/6 vested", () => {
+      assert.equal(r.disbursableWhaleImmediate, 80n * e18);
+      assert.equal(r.disbursableWhaleVested, 400n * e18);
+      assert.equal(r.disbursableWhaleImmediate + r.disbursableWhaleVested, 480n * e18);
+    });
+
+    it("splits CCA whale proportionally for tracker recording", () => {
+      assert.equal(r.ccaWhaleImmediate, 66666666666666666666n);
+      assert.equal(r.ccaWhaleVested, 400n * e18 - 66666666666666666666n);
+      assert.equal(r.ccaWhaleImmediate + r.ccaWhaleVested, r.ccaWhale);
     });
 
     it("normal disbursable equals CCA normal (no bonus)", () => {
@@ -27,12 +35,9 @@ describe("computeDisbursement", () => {
     });
 
     it("actual token amounts include the bonus", () => {
-      const actualTotal = r.disbursableNormal + r.disbursableWhale;
+      const actualTotal =
+        r.disbursableNormal + r.disbursableWhaleImmediate + r.disbursableWhaleVested;
       assert.equal(actualTotal, 580n * e18);
-    });
-
-    it("disbursable exceeds CCA amount for whale portion", () => {
-      assert.notEqual(r.ccaWhale, r.disbursableWhale);
     });
   });
 
@@ -44,8 +49,10 @@ describe("computeDisbursement", () => {
       assert.equal(r.disbursableNormal, 0n);
     });
 
-    it("applies 20% bonus", () => {
-      assert.equal(r.disbursableWhale, 1200n * e18);
+    it("applies 20% bonus and splits into 1/6 immediate and 5/6 vested", () => {
+      assert.equal(r.disbursableWhaleImmediate, 200n * e18);
+      assert.equal(r.disbursableWhaleVested, 1000n * e18);
+      assert.equal(r.disbursableWhaleImmediate + r.disbursableWhaleVested, 1200n * e18);
     });
   });
 
@@ -54,7 +61,8 @@ describe("computeDisbursement", () => {
 
     it("has no whale portion", () => {
       assert.equal(r.ccaWhale, 0n);
-      assert.equal(r.disbursableWhale, 0n);
+      assert.equal(r.disbursableWhaleImmediate, 0n);
+      assert.equal(r.disbursableWhaleVested, 0n);
     });
 
     it("normal tokens pass through 1:1 (no bonus, no vesting)", () => {
@@ -67,8 +75,11 @@ describe("computeDisbursement", () => {
 
     it("everything is zero", () => {
       assert.equal(r.ccaWhale, 0n);
+      assert.equal(r.ccaWhaleImmediate, 0n);
+      assert.equal(r.ccaWhaleVested, 0n);
       assert.equal(r.ccaNormal, 0n);
-      assert.equal(r.disbursableWhale, 0n);
+      assert.equal(r.disbursableWhaleImmediate, 0n);
+      assert.equal(r.disbursableWhaleVested, 0n);
       assert.equal(r.disbursableNormal, 0n);
     });
   });
@@ -80,9 +91,9 @@ describe("computeDisbursement", () => {
       assert.equal(r.ccaWhale, 3n);
     });
 
-    it("bonus is truncated for dust amounts", () => {
-      // 3 * 12000 / 10000 = 3 (integer division)
-      assert.equal(r.disbursableWhale, 3n);
+    it("bonus is truncated and 1/6 split truncates to zero for dust", () => {
+      assert.equal(r.disbursableWhaleImmediate, 0n);
+      assert.equal(r.disbursableWhaleVested, 3n);
     });
   });
 
@@ -102,7 +113,13 @@ describe("computeDisbursement", () => {
         assert.equal(r.ccaWhale, whale);
         assert.equal(r.ccaNormal, normal);
 
-        assert.ok(r.disbursableWhale >= r.ccaWhale, "disbursable whale must be >= CCA whale");
+        const disbursableWhale = r.disbursableWhaleImmediate + r.disbursableWhaleVested;
+        assert.ok(disbursableWhale >= r.ccaWhale, "disbursable whale must be >= CCA whale");
+        assert.equal(
+          r.ccaWhaleImmediate + r.ccaWhaleVested,
+          r.ccaWhale,
+          "CCA immediate + vested must equal total CCA whale",
+        );
 
         assert.equal(r.disbursableNormal, normal);
       });
