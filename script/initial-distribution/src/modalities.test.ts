@@ -48,6 +48,9 @@ describe("EVMModality matches Solidity enum Modality in TDEDisbursement.sol", ()
 
 describe("MODALITIES timestamps match VESTING_PARAMS_FOR_MODALITY in TDEDisbursement.sol", () => {
   // Hardcoded from TDEDisbursement.sol VESTING_PARAMS_FOR_MODALITY.
+  // These params live in function logic, not in the ABI, so we can't
+  // read them from Forge artifacts the way abiChecker.ts does. If the
+  // Solidity params change, this table must be updated manually.
   // Each entry: [startTimestamp, durationSeconds, cliffSeconds]
   const solidityParams: Record<string, [bigint, bigint, bigint]> = {
     VESTED_0_12: [1770303600n, 31536000n, 2419200n],

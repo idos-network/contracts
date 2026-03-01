@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import { computeDisbursement } from "./computeDisbursement.js";
-import { type EVMModality, EVMModality as M } from "./modalities.js";
+import { EVMModality } from "./modalities.js";
 import { splitBy, sumOf } from "./lib.js";
 
 export interface DisbursementEntry {
@@ -43,7 +43,7 @@ export function buildExpectedEntries(
     if (r.disbursableWhaleImmediate > 0n) {
       entries.push({
         kind: "tde",
-        modality: M.DIRECT,
+        modality: EVMModality.DIRECT,
         to: addr,
         ccaAmount: r.ccaWhaleImmediate,
         transferAmount: r.disbursableWhaleImmediate,
@@ -53,7 +53,7 @@ export function buildExpectedEntries(
     if (r.disbursableWhaleVested > 0n) {
       entries.push({
         kind: "tde",
-        modality: M.VESTED_1_5,
+        modality: EVMModality.VESTED_1_5,
         to: addr,
         ccaAmount: r.ccaWhaleVested,
         transferAmount: r.disbursableWhaleVested,
@@ -63,7 +63,7 @@ export function buildExpectedEntries(
     if (r.ccaNormal > 0n) {
       entries.push({
         kind: "tde",
-        modality: M.DIRECT,
+        modality: EVMModality.DIRECT,
         to: addr,
         ccaAmount: r.ccaNormal,
         transferAmount: r.disbursableNormal,
@@ -74,7 +74,7 @@ export function buildExpectedEntries(
   if (sweep && sweep.amount > 0n) {
     entries.push({
       kind: "sweep",
-      modality: M.DIRECT,
+      modality: EVMModality.DIRECT,
       to: sweep.recipient,
       ccaAmount: sweep.amount,
       transferAmount: sweep.amount,

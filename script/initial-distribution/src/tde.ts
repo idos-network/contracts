@@ -12,7 +12,7 @@ import {
 import { chainSetup } from "./chains.js";
 import { type DisbursementRow, loadDisbursementCsv } from "./csv.js";
 import { ensureHex, paginatedGetEvents, receiptFor, requiredArgs, requireEnv } from "./lib.js";
-import { findPendingRows } from "./tdePending.js";
+import { findPendingRows } from "./findPendingRows.js";
 
 // --- Config ---
 
@@ -60,8 +60,6 @@ async function ensureAllowance(totalNeeded: bigint): Promise<void> {
     await tokenContract.write.approve([TDE_DISBURSEMENT_ADDRESS, totalNeeded]),
   );
 }
-
-// findPendingRows is imported from ./tdePending.js
 
 async function disburseAll(pending: DisbursementRow[]): Promise<void> {
   const calls: BatchCall[] = pending.map(({ address, modality, amount }) => ({

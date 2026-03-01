@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Address } from "viem";
 import type { DisbursementRow } from "./csv.js";
-import { findPendingRows } from "./tdePending.js";
+import { findPendingRows } from "./findPendingRows.js";
 
 const ADDR_A = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as Address;
 const ADDR_B = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB" as Address;

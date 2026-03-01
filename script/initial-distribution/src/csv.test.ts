@@ -2,17 +2,13 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import { getAddress } from "viem";
 import { loadDisbursementCsv } from "./csv.js";
 
 const VALID_ADDRESS = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa";
 
 let tempDir: string;
-
-function setup() {
-  tempDir = mkdtempSync(join(tmpdir(), "csv-test-"));
-}
 
 function writeCsv(content: string): string {
   const path = join(tempDir, "test.csv");
@@ -21,12 +17,15 @@ function writeCsv(content: string): string {
 }
 
 describe("loadDisbursementCsv", () => {
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "csv-test-"));
+  });
+
   afterEach(() => {
-    if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("parses a valid CSV row", () => {
-    setup();
     const path = writeCsv(
       `Wallet address,Token amount 10e18,Modality\n${VALID_ADDRESS},1000,Masterlist\n`,
     );
@@ -38,7 +37,6 @@ describe("loadDisbursementCsv", () => {
   });
 
   it("maps modalities to correct EVM IDs", () => {
-    setup();
     const path = writeCsv(
       [
         "Wallet address,Token amount 10e18,Modality",
@@ -52,7 +50,6 @@ describe("loadDisbursementCsv", () => {
   });
 
   it("throws on unknown modality", () => {
-    setup();
     const path = writeCsv(
       `Wallet address,Token amount 10e18,Modality\n${VALID_ADDRESS},100,BogusModality\n`,
     );
@@ -60,7 +57,6 @@ describe("loadDisbursementCsv", () => {
   });
 
   it("throws on invalid bigint in amount column", () => {
-    setup();
     const path = writeCsv(
       `Wallet address,Token amount 10e18,Modality\n${VALID_ADDRESS},not_a_number,Masterlist\n`,
     );
@@ -68,13 +64,11 @@ describe("loadDisbursementCsv", () => {
   });
 
   it("returns empty array for header-only CSV", () => {
-    setup();
     const path = writeCsv("Wallet address,Token amount 10e18,Modality\n");
     assert.deepEqual(loadDisbursementCsv(path), []);
   });
 
   it("trims whitespace from values", () => {
-    setup();
     const path = writeCsv(
       `Wallet address,Token amount 10e18,Modality\n  ${VALID_ADDRESS}  ,  500  ,  Masterlist  \n`,
     );
@@ -84,7 +78,6 @@ describe("loadDisbursementCsv", () => {
   });
 
   it("checksums addresses", () => {
-    setup();
     const lowercase = VALID_ADDRESS.toLowerCase();
     const path = writeCsv(
       `Wallet address,Token amount 10e18,Modality\n${lowercase},100,Masterlist\n`,

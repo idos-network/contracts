@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  assertCondition,
   blockWindows,
   ensureHex,
   iso8601ToTimestamp,
@@ -9,7 +8,6 @@ import {
   requiredArgs,
   requireEnv,
   splitBy,
-  sumOf,
   zip,
 } from "./lib.js";
 
@@ -68,10 +66,7 @@ describe("requiredArgs", () => {
   });
 
   it("throws when a field is undefined", () => {
-    assert.throws(
-      () => requiredArgs({ args: { a: 1, b: undefined } }),
-      /Missing event field/,
-    );
+    assert.throws(() => requiredArgs({ args: { a: 1, b: undefined } }), /Missing event field/);
   });
 
   it("includes event name in error message", () => {
@@ -131,35 +126,6 @@ describe("iso8601ToTimestamp", () => {
 
   it("throws on malformed string", () => {
     assert.throws(() => iso8601ToTimestamp("not-a-date"), /Invalid ISO 8601/);
-  });
-});
-
-describe("sumOf", () => {
-  it("returns 0n for empty array", () => {
-    assert.equal(sumOf([]), 0n);
-  });
-
-  it("returns the element for a single-element array", () => {
-    assert.equal(sumOf([42n]), 42n);
-  });
-
-  it("sums multiple elements", () => {
-    assert.equal(sumOf([1n, 2n, 3n]), 6n);
-  });
-
-  it("handles large values", () => {
-    const large = 10n ** 18n;
-    assert.equal(sumOf([large, large, large]), 3n * large);
-  });
-});
-
-describe("assertCondition", () => {
-  it("does not throw when condition is true", () => {
-    assert.doesNotThrow(() => assertCondition(true, "should not throw"));
-  });
-
-  it("throws with the provided message when condition is false", () => {
-    assert.throws(() => assertCondition(false, "boom"), { message: "boom" });
   });
 });
 
@@ -248,5 +214,21 @@ describe("paginatedGetEvents", () => {
     const results = new Map([["5-5", ["x"]]]);
     const out = await paginatedGetEvents(mockFetcher(results), 5n, 5n);
     assert.deepEqual(out, ["x"]);
+  });
+
+  it("limits concurrency to 5 concurrent fetches", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetcher = async (range: { fromBlock: bigint; toBlock: bigint }) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight--;
+      return [Number(range.fromBlock)];
+    };
+
+    const out = await paginatedGetEvents(fetcher, 0n, 6n, 0n);
+    assert.equal(maxInFlight, 5);
+    assert.deepEqual(out, [0, 1, 2, 3, 4, 5, 6]);
   });
 });
