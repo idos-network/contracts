@@ -12,14 +12,14 @@ import {
 } from "./tdeSetup.js";
 
 const {
-  tdeTimestamp,
-  nowTimestamp,
-  account,
-  publicClient,
   batchConfig,
-  tokenContract,
+  nowTimestamp,
+  publicClient,
   tdeDisbursementAddress,
   tdeDisbursementDeploymentBlock,
+  tdeDisburser,
+  tdeTimestamp,
+  tokenContract,
 } = await setupTdeEnvironment();
 
 const filterCurrentlyDisbursableRows =
@@ -48,7 +48,7 @@ if (disbursableRows.length === 0) {
 
   await ensureAllowance(
     tokenContract,
-    account.address,
+    tdeDisburser.account.address,
     publicClient,
     tdeDisbursementAddress,
     sumOf(disbursableRows.map((r) => r.amount)),

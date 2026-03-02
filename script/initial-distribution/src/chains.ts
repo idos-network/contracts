@@ -6,7 +6,7 @@ import {
   http,
   type PublicClient,
 } from "viem";
-import { type PrivateKeyToAccountOptions, privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
 import { assertCondition } from "./lib.js";
 
@@ -33,19 +33,16 @@ export async function validateRpcChainId(publicClient: PublicClient, chain: Chai
   );
 }
 
-export async function chainSetup(
-  chainId: string,
-  rpcUrl: string,
-  accountPrivateKey: Hex,
-  accountOptions?: PrivateKeyToAccountOptions,
-) {
+export async function chainSetup(chainId: string, rpcUrl: string) {
   const chain = resolveChain(chainId);
-  const account = privateKeyToAccount(accountPrivateKey, accountOptions);
   const transport = http(rpcUrl);
   const publicClient = createPublicClient({ chain, transport });
-  const walletClient = createWalletClient({ account, chain, transport });
-
   await validateRpcChainId(publicClient, chain);
+  return { chain, transport, publicClient };
+}
 
-  return { chain, account, publicClient, walletClient };
+export function makeWallet(chain: Chain, transport: ReturnType<typeof http>, privateKey: Hex) {
+  const account = privateKeyToAccount(privateKey);
+  const walletClient = createWalletClient({ account, chain, transport });
+  return { account, walletClient };
 }
