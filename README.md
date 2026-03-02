@@ -1,10 +1,16 @@
 # Contracts
 
-See the [Audit report](./NM0731-FINAL_IDOS.pdf). It was added on [f0ba57e](https://github.com/idos-network/contracts/tree/f0ba57e502eb2eeef1ce19b2135366dfff230f26).
+See the [Audit report](./NM0731-FINAL_IDOS.pdf). It was added on
+[f0ba57e](https://github.com/idos-network/contracts/tree/f0ba57e502eb2eeef1ce19b2135366dfff230f26)
+for a subset of the contracts used.
+
+For documentation about the initial distribution, see the
+[script/initial-distribution's README](./script/initial-distribution/README.md).
 
 ## Setup
 
-Install [Foundry](https://getfoundry.sh/) at the version used by this repo, then install dependencies:
+Install [Foundry](https://getfoundry.sh/) at the version used by this repo, then
+install dependencies:
 
 ```bash
 foundryup -i $(cat .foundry-version)
@@ -26,9 +32,11 @@ forge test
 
 ## Deploy
 
-IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and Arbitrum Sepolia (421614). Addresses are in `deployments.toml`.
+IDOSToken and IDOSNodeStaking are already deployed on Arbitrum One (42161) and
+Arbitrum Sepolia (421614). Addresses are in `deployments.toml`.
 
-To run the deployment script (skips deployment on known chains, deploys otherwise):
+To run the deployment script (skips deployment on known chains, deploys
+otherwise):
 
 ```bash
 # Load .env and run (Arbitrum One - will skip, already deployed)
@@ -40,12 +48,12 @@ INITIAL_OWNER=0x... forge script script/DeployIDOSNodeStaking.s.sol --rpc-url se
 
 ## Verify on Etherscan
 
-Should be done automatically by the deployment script, but can be done manually with:
+Should be done automatically by the deployment script, but can be done manually
+with:
 
 ```bash
 forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain arbitrum_one --etherscan-api-key $ETHERSCAN_API_KEY
 ```
 
-See also gas experiments here: https://github.com/idos-network/node-staking-gas-tests
-
-![contract list](assets/contracts.png)
+See also gas experiments here:
+<https://github.com/idos-network/node-staking-gas-tests>.

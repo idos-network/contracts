@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+/// @title BatchCaller
 /// @notice EIP-7702 delegation target that batches arbitrary calls from the
 ///         delegating EOA. `execute` requires `msg.sender == address(this)`,
 ///         meaning only the EOA itself can call it (since, under EIP-7702,
@@ -19,6 +20,9 @@ contract BatchCaller {
 
     receive() external payable {}
 
+    /// @notice Execute a batch of calls sequentially. Reverts if any call fails.
+    ///         Can only be called by the delegating EOA itself (msg.sender == address(this)).
+    /// @param calls Array of (target, data) pairs to execute in order.
     function execute(Call[] calldata calls) external {
         if (msg.sender != address(this)) revert OnlyCallableBySelf();
 

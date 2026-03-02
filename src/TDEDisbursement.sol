@@ -20,6 +20,11 @@ enum Modality {
     VESTED_12_36
 }
 
+/// @title TDEDisbursement
+/// @notice Disburses IDOS tokens to beneficiaries, either directly or through
+///         per-beneficiary vesting contracts. Each (beneficiary, modality) pair
+///         gets at most one deterministically deployed IDOSVesting contract,
+///         enabling multiple disbursements to accumulate in the same vesting wallet.
 contract TDEDisbursement {
     using SafeERC20 for IERC20;
 
@@ -54,6 +59,13 @@ contract TDEDisbursement {
         _;
     }
 
+    /// @notice Disburse tokens to a beneficiary. For DIRECT modality, tokens go
+    ///         straight to the beneficiary. For vested modalities, tokens go to a
+    ///         deterministic IDOSVesting contract (created on first use).
+    /// @param beneficiary The address that will ultimately receive/own the tokens.
+    /// @param amount The number of tokens (in wei) to transfer.
+    /// @param modality The disbursement modality, which determines whether tokens
+    ///        are sent directly or locked in a vesting schedule.
     function disburse(address beneficiary, uint256 amount, Modality modality) external onlyDisburser {
         if (beneficiary == address(0)) revert ZeroAddressBeneficiary();
         address transferTarget = beneficiary;
@@ -68,6 +80,13 @@ contract TDEDisbursement {
         emit Disbursed(beneficiary, transferTarget, amount, modality);
     }
 
+    /// @notice Returns (or creates) the vesting contract for a given beneficiary
+    ///         and modality. Uses CREATE2 with a salt derived from the beneficiary
+    ///         and modality, so the address is deterministic.
+    /// @param beneficiary The address that will own the vesting contract.
+    /// @param modality The vesting schedule to use (must not be DIRECT).
+    /// @return vestingContract The IDOSVesting contract for this (beneficiary, modality) pair.
+    /// @return created True if the contract was deployed in this call.
     function ensureVestingContractExists(address beneficiary, Modality modality)
         public
         onlyDisburser
@@ -88,6 +107,11 @@ contract TDEDisbursement {
         }
     }
 
+    /// @notice Returns the vesting schedule parameters for a given modality.
+    /// @param modality The vesting modality (must not be DIRECT).
+    /// @return startTimestamp Unix timestamp when vesting accumulation begins.
+    /// @return durationSeconds Total vesting duration in seconds.
+    /// @return cliffSeconds Cliff period in seconds before any tokens are claimable.
     // forge-lint: disable-next-line(mixed-case-function): I want it to look like an immutable mapping.
     function VESTING_PARAMS_FOR_MODALITY(Modality modality)
         public
@@ -96,7 +120,7 @@ contract TDEDisbursement {
     {
         if (modality == Modality.DIRECT) revert DirectIsNotVested();
 
-        // The accumulation start is 1 month before TDE. That's on purpose, in
+        // In some cases, the accumulation start is 1 month before TDE. That's on purpose, in
         // order to have a full month of vesting claimable at TDE date.
         // Vesting schedule parameters:              accumulation start, duration, cliff
         if (modality == Modality.VESTED_0_12) {

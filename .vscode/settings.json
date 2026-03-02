@@ -6,5 +6,6 @@
   "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
   "[json]": { "editor.defaultFormatter": "biomejs.biome" },
   "[solidity]": { "editor.defaultFormatter": "NomicFoundation.hardhat-solidity" },
-  "solidity.formatter": "forge"
+  "solidity.formatter": "forge",
+  "biome.lspBin": "./script/initial-distribution/node_modules/@biomejs/biome/bin/biome"
 }
