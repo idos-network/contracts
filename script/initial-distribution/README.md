@@ -34,9 +34,9 @@ These scripts interact with several on-chain contracts:
   first disburse for a given beneficiary+modality pair.
 - **ContinuousClearingAuction (CCA)** -- The auction contract (external to this
   repo). Scripts read its events to determine filled bids. Note that this
-  contract doesn't distribute $IDOS tokens directly, it uses $rIDOS to enable
-  multiple distribution modalities (whale vs. normal phases) from a single
-  auction.
+  contract doesn't distribute $IDOS tokens directly, it uses $rIDOS (a
+  `CCADisbursementTracker`) to enable multiple distribution modalities (whale
+  vs. normal phases) from a single auction.
 - **CCADisbursementTracker** -- Bookkeeping contract for the CCA flow. It
   bridges the gap between what the CCA thinks should be disbursed and what's
   actually disbursed by our scripts. It has a
