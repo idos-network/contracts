@@ -98,14 +98,14 @@ and claim tokens for all CCA bids.
 
 ### Infrastructure
 
-| File            | Description                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------- |
-| `tdeSetup.ts`   | TDE environment setup: chain config, wallet clients, token allowance, and batch disburse orchestration. |
-| `batch.ts`      | EIP-7702 batch execution: delegates to `BatchCaller`, groups `disburse` calls into gas-sized batches.   |
-| `chains.ts`     | Resolves chain config by ID (Arbitrum One, Arbitrum Sepolia, Sepolia) and creates viem clients.         |
-| `abis.ts`       | Contract ABIs, validated against Forge build artifacts at import time.                                  |
-| `abiChecker.ts` | Checks that hardcoded ABIs in `abis.ts` match current Forge artifacts.                                  |
-| `lib.ts`        | Shared utilities: `requireEnv`, `paginatedGetEvents`, `blockWindows`, `findFirstBlockAtOrAfter`, etc.   |
+| File            | Description                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `tdeSetup.ts`   | TDE environment setup: chain config, wallet clients, token allowance, and batch disburse orchestration.                        |
+| `batch.ts`      | EIP-7702 batch execution: delegates to `BatchCaller`, groups `disburse` calls into gas-sized batches.                          |
+| `chains.ts`     | Resolves chain config by ID (Arbitrum One, Arbitrum Sepolia, Sepolia), creates viem clients and wallet clients (`makeWallet`). |
+| `abis.ts`       | Contract ABIs, validated against Forge build artifacts at import time.                                                         |
+| `abiChecker.ts` | Checks that hardcoded ABIs in `abis.ts` match current Forge artifacts.                                                         |
+| `lib.ts`        | Shared utilities: `requireEnv`, `paginatedGetEvents`, `blockWindows`, `findFirstBlockAtOrAfter`, etc.                          |
 
 ## Setup
 
@@ -129,9 +129,29 @@ through `BatchCaller` in batched transactions.
 
 ### CCA disbursement
 
+The CCA flow uses two separate disbursers:
+
+- **`TDE_DISBURSER_PRIVATE_KEY`** -- signs `TDEDisbursement.disburse()` calls
+  and IDOS token approvals.
+- **`TRACKER_DISBURSER_PRIVATE_KEY`** -- signs
+  `CCADisbursementTracker.recordDisbursement()` calls and
+  `CCA.exitBid()`/`claimTokens()` calls.
+
 ```bash
 pnpm claim-all-bids   # exit and claim all CCA bids (run first)
 pnpm cca              # compute and execute CCA disbursements
+```
+
+### Local fork testing
+
+`fork-run.sh` spins up an Anvil fork of Arbitrum One, funds both disbursers,
+patches the CCA so its `endBlock`/`claimBlock` are in the past, and runs
+`claim-all-bids` followed by `cca` against the fork.
+
+```bash
+export TDE_DISBURSER_PRIVATE_KEY=0x...
+export TRACKER_DISBURSER_PRIVATE_KEY=0x...
+./fork-run.sh
 ```
 
 ### Tests and linting
