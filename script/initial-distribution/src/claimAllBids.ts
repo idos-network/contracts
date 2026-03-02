@@ -2,8 +2,8 @@
  * Claim all unclaimed CCA bids: exit any unexited bids, then claim tokens (batch per owner).
  *
  * Uses the same .env as the main initial-distribution script: CHAIN_ID, RPC_URL, CCA_ADDRESS,
- * and DISBURSER_PRIVATE_KEY for sending transactions. Anyone can call
- * exit/claim; tokens are sent to the bid owner.
+ * and TRACKER_DISBURSER_PRIVATE_KEY for sending transactions.
+ * Anyone can call exit/claim; tokens are sent to the bid owner.
  *
  * Usage: pnpm exec tsx src/claimAllBids.ts
  */
@@ -11,7 +11,7 @@
 import "dotenv/config";
 import { type Address, getAddress, getContract } from "viem";
 import { ccaAbi } from "./abis.js";
-import { chainSetup } from "./chains.js";
+import { chainSetup, makeWallet } from "./chains.js";
 import {
   assertCondition,
   contractHasCode,
@@ -24,19 +24,16 @@ import {
 
 const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
 const CHAIN_ID = requireEnv("CHAIN_ID");
-const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+const TRACKER_DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("TRACKER_DISBURSER_PRIVATE_KEY"));
 const RPC_URL = requireEnv("RPC_URL");
 
-const { chain, publicClient, walletClient } = await chainSetup(
-  CHAIN_ID,
-  RPC_URL,
-  DISBURSER_PRIVATE_KEY,
-);
+const { chain, transport, publicClient } = await chainSetup(CHAIN_ID, RPC_URL);
+const trackerDisburser = makeWallet(chain, transport, TRACKER_DISBURSER_PRIVATE_KEY);
 
 const ccaContract = getContract({
   address: CCA_ADDRESS,
   abi: ccaAbi,
-  client: { public: publicClient, wallet: walletClient },
+  client: trackerDisburser.walletClient,
 });
 
 type BidState = Awaited<ReturnType<typeof ccaContract.read.bids>>;

@@ -1,8 +1,7 @@
 import { type Address, encodeFunctionData, getAddress, getContract, type PublicClient } from "viem";
-import { nonceManager } from "viem/accounts";
 import { erc20Abi, tdeDisbursementAbi } from "./abis.js";
 import { type BatchCallerConfig, executeInGasFilledBatches } from "./batch.js";
-import { chainSetup } from "./chains.js";
+import { chainSetup, makeWallet } from "./chains.js";
 import type { DisbursementRow } from "./csv.js";
 import {
   ensureHex,
@@ -18,39 +17,35 @@ export async function setupTdeEnvironment() {
   const tdeDisbursementAddress = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
   const tdeDisbursementDeploymentBlock = BigInt(requireEnv("TDE_DISBURSEMENT_DEPLOYMENT_BLOCK"));
   const BATCH_CALLER_ADDRESS = getAddress(requireEnv("BATCH_CALLER_ADDRESS"));
-  const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+  const TDE_DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("TDE_DISBURSER_PRIVATE_KEY"));
   const RPC_URL = requireEnv("RPC_URL");
 
   const tdeTimestamp = iso8601ToTimestamp(requireEnv("TDE_DATETIME"));
   const nowTimestamp = BigInt(Math.floor(Date.now() / 1000));
 
-  const { account, publicClient, walletClient } = await chainSetup(
-    CHAIN_ID,
-    RPC_URL,
-    DISBURSER_PRIVATE_KEY,
-    { nonceManager },
-  );
+  const { chain, publicClient, transport } = await chainSetup(CHAIN_ID, RPC_URL);
+  const tdeDisburser = makeWallet(chain, transport, TDE_DISBURSER_PRIVATE_KEY);
 
   const batchConfig: BatchCallerConfig = {
     publicClient,
-    walletClient,
+    walletClient: tdeDisburser.walletClient,
     batchCallerAddress: BATCH_CALLER_ADDRESS,
   };
 
   const tdeDisbursementContract = getContract({
     address: tdeDisbursementAddress,
     abi: tdeDisbursementAbi,
-    client: walletClient,
+    client: tdeDisburser.walletClient,
   });
 
   const tokenContract = getContract({
     address: await tdeDisbursementContract.read.IDOS_TOKEN(),
     abi: erc20Abi,
-    client: walletClient,
+    client: tdeDisburser.walletClient,
   });
 
   return {
-    account,
+    tdeDisburser,
     publicClient,
     batchConfig,
     tokenContract,

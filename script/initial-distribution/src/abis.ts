@@ -202,14 +202,11 @@ export const ccaAbi = [
 
 export const tdeDisbursementAbi = [
   {
-    type: "event",
-    name: "Disbursed",
-    inputs: [
-      { name: "beneficiary", type: "address", indexed: true },
-      { name: "transferTarget", type: "address", indexed: false },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "modality", type: "uint8", indexed: false },
-    ],
+    type: "function",
+    name: "DISBURSER",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -217,6 +214,17 @@ export const tdeDisbursementAbi = [
     inputs: [],
     outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "VESTING_PARAMS_FOR_MODALITY",
+    inputs: [{ name: "modality", type: "uint8" }],
+    outputs: [
+      { name: "startTimestamp", type: "uint64" },
+      { name: "durationSeconds", type: "uint64" },
+      { name: "cliffSeconds", type: "uint64" },
+    ],
+    stateMutability: "pure",
   },
   {
     type: "function",
@@ -231,16 +239,6 @@ export const tdeDisbursementAbi = [
   },
   {
     type: "function",
-    name: "vestingContracts",
-    inputs: [
-      { name: "beneficiary", type: "address" },
-      { name: "modality", type: "uint8" },
-    ],
-    outputs: [{ name: "vestingWallet", type: "address" }],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
     name: "ensureVestingContractExists",
     inputs: [
       { name: "beneficiary", type: "address" },
@@ -252,6 +250,42 @@ export const tdeDisbursementAbi = [
     ],
     stateMutability: "nonpayable",
   },
+  {
+    type: "function",
+    name: "vestingContracts",
+    inputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "modality", type: "uint8" },
+    ],
+    outputs: [{ name: "vestingWallet", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "Disbursed",
+    inputs: [
+      { name: "beneficiary", type: "address", indexed: true },
+      { name: "transferTarget", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "modality", type: "uint8", indexed: false },
+    ],
+    anonymous: false,
+  },
+  { type: "error", name: "DirectIsNotVested", inputs: [] },
+  { type: "error", name: "OnlyCallableByDisburser", inputs: [] },
+  {
+    type: "error",
+    name: "SafeERC20FailedOperation",
+    inputs: [{ name: "token", type: "address", internalType: "address" }],
+  },
+  {
+    type: "error",
+    name: "UnknownModality",
+    inputs: [{ name: "modality", type: "uint8", internalType: "enum Modality" }],
+  },
+  { type: "error", name: "ZeroAddressBeneficiary", inputs: [] },
+  { type: "error", name: "ZeroAddressDisburser", inputs: [] },
+  { type: "error", name: "ZeroAddressToken", inputs: [] },
 ] as const;
 
 export const batchCallerAbi = [

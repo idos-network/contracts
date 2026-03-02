@@ -3,7 +3,7 @@ import "dotenv/config";
 import { type Address, formatEther, getAddress, getContract, type Hex } from "viem";
 import { ccaAbi, erc20Abi, tdeDisbursementAbi, trackerAbi } from "./abis.js";
 import { buildExpectedEntries, type DisbursementEntry } from "./ccaEntries.js";
-import { chainSetup } from "./chains.js";
+import { chainSetup, makeWallet } from "./chains.js";
 import {
   assertCondition,
   blockToTimestamp,
@@ -27,14 +27,14 @@ const CCA_ADDRESS = getAddress(requireEnv("CCA_ADDRESS"));
 const SOLD_TOKEN_ADDRESS = getAddress(requireEnv("SOLD_TOKEN_ADDRESS"));
 const TDE_DISBURSEMENT_ADDRESS = getAddress(requireEnv("TDE_DISBURSEMENT_ADDRESS"));
 const NORMAL_PHASE_START = iso8601ToTimestamp(requireEnv("NORMAL_PHASE_START"));
-const DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("DISBURSER_PRIVATE_KEY"));
+const TDE_DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("TDE_DISBURSER_PRIVATE_KEY"));
+const TRACKER_DISBURSER_PRIVATE_KEY = ensureHex(requireEnv("TRACKER_DISBURSER_PRIVATE_KEY"));
 const RPC_URL = requireEnv("RPC_URL");
 
-const { chain, account, publicClient, walletClient } = await chainSetup(
-  CHAIN_ID,
-  RPC_URL,
-  DISBURSER_PRIVATE_KEY,
-);
+const { chain, transport, publicClient } = await chainSetup(CHAIN_ID, RPC_URL);
+
+const tdeDisburser = makeWallet(chain, transport, TDE_DISBURSER_PRIVATE_KEY);
+const trackerDisburser = makeWallet(chain, transport, TRACKER_DISBURSER_PRIVATE_KEY);
 
 const ccaContract = getContract({
   address: CCA_ADDRESS,
@@ -45,19 +45,19 @@ const ccaContract = getContract({
 const soldTokenContract = getContract({
   address: SOLD_TOKEN_ADDRESS,
   abi: erc20Abi,
-  client: walletClient,
+  client: tdeDisburser.walletClient,
 });
 
 const tdeDisbursementContract = getContract({
   address: TDE_DISBURSEMENT_ADDRESS,
   abi: tdeDisbursementAbi,
-  client: walletClient,
+  client: tdeDisburser.walletClient,
 });
 
 const trackerContract = getContract({
   address: TRACKER_TOKEN_ADDRESS,
   abi: trackerAbi,
-  client: walletClient,
+  client: trackerDisburser.walletClient,
 });
 
 for (const contract of [ccaContract, trackerContract, soldTokenContract, tdeDisbursementContract]) {
@@ -68,12 +68,19 @@ for (const contract of [ccaContract, trackerContract, soldTokenContract, tdeDisb
 }
 console.log(`✅ All contracts addresses have deployed code.`);
 
-const onChainDisburser = getAddress(await trackerContract.read.disburser());
+const onChainTrackerDisburser = getAddress(await trackerContract.read.disburser());
 assertCondition(
-  onChainDisburser === getAddress(account.address),
-  `${account.address} is not the disburser (expected ${onChainDisburser}).`,
+  onChainTrackerDisburser === trackerDisburser.account.address,
+  `${trackerDisburser.account.address} is not the CCADisbursementTracker disburser (expected ${onChainTrackerDisburser}).`,
 );
-console.log(`✅ Disburser address matches expected: ${onChainDisburser}`);
+console.log(`✅ CCADisbursementTracker disburser address matches: ${onChainTrackerDisburser}`);
+
+const onChainTDEDisburser = getAddress(await tdeDisbursementContract.read.DISBURSER());
+assertCondition(
+  onChainTDEDisburser === tdeDisburser.account.address,
+  `${tdeDisburser.account.address} is not the TDEDisbursement disburser (expected ${onChainTDEDisburser}).`,
+);
+console.log(`✅ TDEDisbursement disburser address matches: ${onChainTDEDisburser}`);
 
 // ── 1. Fetch CCA data, resolve phase boundary, compute filled bids ──────────
 
@@ -161,7 +168,7 @@ const filledBids = tokensClaims.map((tc) => {
 
 async function ensureTdeAllowance(totalNeeded: bigint): Promise<void> {
   const currentAllowance = await soldTokenContract.read.allowance([
-    account.address,
+    tdeDisburser.account.address,
     TDE_DISBURSEMENT_ADDRESS,
   ]);
   if (currentAllowance >= totalNeeded) return;
@@ -217,7 +224,7 @@ async function findUnrecordedTransfer(
   }
 
   const logs = await soldTokenContract.getEvents.Transfer(
-    { from: account.address, to: entry.to },
+    { from: tdeDisburser.account.address, to: entry.to },
     { fromBlock, toBlock },
   );
   const match = logs.find((l) => l.args.value === entry.transferAmount);
@@ -291,10 +298,10 @@ if (remainingEntries.length > 0) {
   }
 
   const remainingTokenTotal = sumOf(remainingEntries.map((e) => e.transferAmount));
-  const disburserBalance = await soldTokenContract.read.balanceOf([account.address]);
+  const disburserBalance = await soldTokenContract.read.balanceOf([tdeDisburser.account.address]);
   assertCondition(
     disburserBalance >= remainingTokenTotal,
-    `${account.address} has insufficient token balance of ${soldTokenContract.address}. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
+    `${tdeDisburser.account.address} has insufficient token balance of ${soldTokenContract.address}. Has ${formatEther(disburserBalance)}, needs ${formatEther(remainingTokenTotal)}.`,
   );
   console.log(`✅ Disburser has sufficient token balance.`);
 
@@ -320,7 +327,9 @@ assertCondition(
 );
 console.log(`✅ Sale is fully disbursed.`);
 
-const finalDisburserBalance = await soldTokenContract.read.balanceOf([account.address]);
+const finalDisburserBalance = await soldTokenContract.read.balanceOf([
+  tdeDisburser.account.address,
+]);
 const sweepTarget = await ccaContract.read.tokensRecipient();
 if (finalDisburserBalance > 0n) {
   console.log(
@@ -332,7 +341,7 @@ if (finalDisburserBalance > 0n) {
   );
 
   assertCondition(
-    (await soldTokenContract.read.balanceOf([account.address])) === 0n,
+    (await soldTokenContract.read.balanceOf([tdeDisburser.account.address])) === 0n,
     `Sweep failed: disburser balance is not 0 after sweep. This should never happen.`,
   );
   console.log(`✅ No remaining tokens on disburser.`);
