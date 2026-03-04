@@ -3,6 +3,7 @@ disbursable
 EpochRewardDidntChange
 idOS
 IERC20
+Masterlist
 MULTICALL
 reentrancy
 soldeer

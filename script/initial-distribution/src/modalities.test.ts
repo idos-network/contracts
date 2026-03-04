@@ -1,11 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { iso8601ToTimestamp } from "./lib.js";
-import { EVMModality, isKnownModality, MODALITIES, MODALITIES_TS_TO_EVM } from "./modalities.js";
+import {
+  EVMModality,
+  isKnownModality,
+  MODALITIES,
+  MODALITIES_NOT_DISBURSED_BY_OUR_SCRIPT,
+  MODALITIES_TS_TO_EVM,
+} from "./modalities.js";
 
 describe("isKnownModality", () => {
   for (const name of Object.keys(MODALITIES)) {
     it(`returns true for "${name}"`, () => {
+      assert.equal(isKnownModality(name), true);
+    });
+  }
+
+  for (const name of MODALITIES_NOT_DISBURSED_BY_OUR_SCRIPT) {
+    it(`returns true for not-disbursed-by-script "${name}"`, () => {
       assert.equal(isKnownModality(name), true);
     });
   }
@@ -37,11 +49,7 @@ describe("EVMModality matches Solidity enum Modality in TDEDisbursement.sol", ()
 
   for (const [ordinal, name] of solidityEnum.entries()) {
     it(`${name} = ${ordinal}`, () => {
-      assert.equal(
-        EVMModality[name],
-        ordinal,
-        `EVMModality.${name} should be ${ordinal}`,
-      );
+      assert.equal(EVMModality[name], ordinal, `EVMModality.${name} should be ${ordinal}`);
     });
   }
 });
@@ -83,24 +91,15 @@ describe("MODALITIES timestamps match VESTING_PARAMS_FOR_MODALITY in TDEDisburse
     const [vestingStartIso, cliffEndIso, vestingEndIso] = timestamps;
 
     it(`"${tsModality}" (${evmName}): vestingStart matches startTimestamp`, () => {
-      assert.equal(
-        iso8601ToTimestamp(vestingStartIso),
-        startTimestamp,
-      );
+      assert.equal(iso8601ToTimestamp(vestingStartIso), startTimestamp);
     });
 
     it(`"${tsModality}" (${evmName}): cliffEnd matches startTimestamp + cliffSeconds`, () => {
-      assert.equal(
-        iso8601ToTimestamp(cliffEndIso),
-        startTimestamp + cliffSeconds,
-      );
+      assert.equal(iso8601ToTimestamp(cliffEndIso), startTimestamp + cliffSeconds);
     });
 
     it(`"${tsModality}" (${evmName}): vestingEnd matches startTimestamp + durationSeconds`, () => {
-      assert.equal(
-        iso8601ToTimestamp(vestingEndIso),
-        startTimestamp + durationSeconds,
-      );
+      assert.equal(iso8601ToTimestamp(vestingEndIso), startTimestamp + durationSeconds);
     });
   }
 });

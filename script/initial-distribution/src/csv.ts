@@ -4,6 +4,7 @@ import { type Address, getAddress } from "viem";
 import {
   type EVMModality,
   isKnownModality,
+  isScriptDisbursedModality,
   MODALITIES_TS_TO_EVM,
   type Modality,
 } from "./modalities.js";
@@ -47,9 +48,11 @@ export function loadDisbursementCsv(csvPath: string): DisbursementRow[] {
     );
   }
 
-  return rows.map((row) => ({
-    address: getAddress(row["Wallet address"]),
-    modality: MODALITIES_TS_TO_EVM[row.Modality as Modality],
-    amount: parseBigInt(row["Token amount 10e18"]),
-  }));
+  return rows
+    .filter((row) => isScriptDisbursedModality(row.Modality as Modality))
+    .map((row) => ({
+      address: getAddress(row["Wallet address"]),
+      modality: MODALITIES_TS_TO_EVM[row.Modality as Modality],
+      amount: parseBigInt(row["Token amount 10e18"]),
+    }));
 }

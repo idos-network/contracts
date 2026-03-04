@@ -86,4 +86,21 @@ describe("loadDisbursementCsv", () => {
     const rows = loadDisbursementCsv(path);
     assert.equal(rows[0].address, getAddress(lowercase));
   });
+
+  it("excludes modalities disbursed manually (C - 12 - 36, C - 6 - 36, Treasury, Staking Rewards)", () => {
+    const path = writeCsv(
+      [
+        "Wallet address,Token amount 10e18,Modality",
+        `${VALID_ADDRESS},100,Masterlist`,
+        `${VALID_ADDRESS},200,C - 12 - 36`,
+        `${VALID_ADDRESS},300,C - 6 - 36`,
+        `${VALID_ADDRESS},400,Treasury`,
+        `${VALID_ADDRESS},500,Staking Rewards`,
+      ].join("\n"),
+    );
+    const rows = loadDisbursementCsv(path);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].modality, EVMModality.DIRECT);
+    assert.equal(rows[0].amount, 100n);
+  });
 });
