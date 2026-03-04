@@ -1,5 +1,13 @@
 # Initial Distribution
 
+## Note well
+
+There's post-scriptums to this script. There are a few details that we only
+caught after deploying TDEDisbursement.sol that require manual intervention. See
+the end of this README for more details on those.
+
+## Overview
+
 TypeScript tooling that drives the IDOS token initial distribution using the
 on-chain `TDEDisbursement` contract. There are two main flows:
 
@@ -167,3 +175,49 @@ pnpm format
 
 - **`disbursement.csv`** -- ~41k rows with columns: `Wallet address`,
   `Token amount 10e18`, `Modality`. Used by the TDE flow.
+
+## Post-scriptums
+
+### 2026-03-04: Treasury and Staking Rewards modalities
+
+We didn't get these right at the start. They should have been:
+
+| Modality                       | Start                  | Cliff                  | End                    |
+| ------------------------------ | ---------------------- | ---------------------- | ---------------------- |
+| Staking Rewards Year 1 - 2     | 2026-03-05T00:00:00Z   | 2026-04-05T00:00:00Z   | 2028-02-05T00:00:00Z   |
+| Staking Rewards Year 3-6       | 2028-02-05T00:00:00Z   | 2028-03-05T00:00:00Z   | 2031-02-05T00:00:00Z   |
+| Staking Rewards Year 7 - 10    | 2031-02-05T00:00:00Z   | 2031-03-05T00:00:00Z   | 2035-02-05T00:00:00Z   |
+| Treasury                       | 2026-03-05T00:00:00Z   | 2026-04-05T00:00:00Z   | 2031-02-05T00:00:00Z   |
+| ------------------------------ | ---------------------- | ---------------------- | ---------------------- |
+
+The differences are:
+
+- The split on Staking Rewards is such that we can distribute different amounts
+  of tokens to time spans (instead of having a single sum over a single linear
+  vesting period).
+- The treasury is end date was one month too short.
+
+The beneficiary for all of those is 0xd5259b6E9D8a413889953a1F3195D8F8350642dE,
+idOS's main treasury wallet.
+
+Translating that to IDOSVesting constructor parameters, we get:
+
+| Modality                    | beneficiary                                | startTimestamp | durationSeconds | cliffSeconds |
+| --------------------------- | ------------------------------------------ | -------------- | --------------- | ------------ |
+| Staking Rewards Year 1 - 2  | 0xd5259b6E9D8a413889953a1F3195D8F8350642dE | 1772668800     | 60652800        | 2678400      |
+| Staking Rewards Year 3-6    | 0xd5259b6E9D8a413889953a1F3195D8F8350642dE | 1833321600     | 94694400        | 2505600      |
+| Staking Rewards Year 7 - 10 | 0xd5259b6E9D8a413889953a1F3195D8F8350642dE | 1928016000     | 126230400       | 2419200      |
+| Treasury                    | 0xd5259b6E9D8a413889953a1F3195D8F8350642dE | 1772668800     | 155347200       | 2678400      |
+
+The deployed vesting contracts are:
+
+| Modality                       | Vesting contract address                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Staking Rewards Year 1 - 2     | [0x03ed348892a88182e74d8e76e6f7529224032ed8](https://arbiscan.io/address/0x03ed348892a88182e74d8e76e6f7529224032ed8) |
+| Staking Rewards Year 3-6       | [0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40](https://arbiscan.io/address/0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40) |
+| Staking Rewards Year 7 - 10    | [0x21d91cedf2cf162c87f14ce988a04c35737f7e0d](https://arbiscan.io/address/0x21d91cedf2cf162c87f14ce988a04c35737f7e0d) |
+| Treasury                       | [0x6a553c044a6a113b01be52372e8d7bc94594bbe8](https://arbiscan.io/address/0x6a553c044a6a113b01be52372e8d7bc94594bbe8) |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+
+These four contracts will be manually funded, and its transactions won't be
+tracked on TDEDisbursement.
