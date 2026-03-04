@@ -2,7 +2,7 @@
 
 ## Note well
 
-There's post-scriptums to this script. There are a few details that we only
+There are post-scriptums to this script. There are a few details that we only
 caught after deploying TDEDisbursement.sol that require manual intervention. See
 the end of this README for more details on those.
 
@@ -195,7 +195,7 @@ The differences are:
 - The split on Staking Rewards is such that we can distribute different amounts
   of tokens to time spans (instead of having a single sum over a single linear
   vesting period).
-- The treasury is end date was one month too short.
+- The treasury's end date was one month too short.
 
 The beneficiary for all of those is 0xd5259b6E9D8a413889953a1F3195D8F8350642dE,
 idOS's main treasury wallet.
@@ -219,5 +219,5 @@ The deployed vesting contracts are:
 | Treasury                       | [0x6a553c044a6a113b01be52372e8d7bc94594bbe8](https://arbiscan.io/address/0x6a553c044a6a113b01be52372e8d7bc94594bbe8) |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 
-These four contracts will be manually funded, and its transactions won't be
+These four contracts will be manually funded, and their transactions won't be
 tracked on TDEDisbursement.
