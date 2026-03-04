@@ -182,13 +182,12 @@ pnpm format
 
 We didn't get these right at the start. They should have been:
 
-| Modality                       | Start                  | Cliff                  | End                    |
-| ------------------------------ | ---------------------- | ---------------------- | ---------------------- |
-| Staking Rewards Year 1 - 2     | 2026-03-05T00:00:00Z   | 2026-04-05T00:00:00Z   | 2028-02-05T00:00:00Z   |
-| Staking Rewards Year 3-6       | 2028-02-05T00:00:00Z   | 2028-03-05T00:00:00Z   | 2031-02-05T00:00:00Z   |
-| Staking Rewards Year 7 - 10    | 2031-02-05T00:00:00Z   | 2031-03-05T00:00:00Z   | 2035-02-05T00:00:00Z   |
-| Treasury                       | 2026-03-05T00:00:00Z   | 2026-04-05T00:00:00Z   | 2031-02-05T00:00:00Z   |
-| ------------------------------ | ---------------------- | ---------------------- | ---------------------- |
+| Modality                    | Start                | Cliff                | End                  |
+| --------------------------- | -------------------- | -------------------- | -------------------- |
+| Staking Rewards Year 1 - 2  | 2026-03-05T00:00:00Z | 2026-04-05T00:00:00Z | 2028-02-05T00:00:00Z |
+| Staking Rewards Year 3-6    | 2028-02-05T00:00:00Z | 2028-03-05T00:00:00Z | 2031-02-05T00:00:00Z |
+| Staking Rewards Year 7 - 10 | 2031-02-05T00:00:00Z | 2031-03-05T00:00:00Z | 2035-02-05T00:00:00Z |
+| Treasury                    | 2026-03-05T00:00:00Z | 2026-04-05T00:00:00Z | 2031-02-05T00:00:00Z |
 
 The differences are:
 
@@ -211,13 +210,12 @@ Translating that to IDOSVesting constructor parameters, we get:
 
 The deployed vesting contracts are:
 
-| Modality                       | Vesting contract address                                                                                             |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Staking Rewards Year 1 - 2     | [0x03ed348892a88182e74d8e76e6f7529224032ed8](https://arbiscan.io/address/0x03ed348892a88182e74d8e76e6f7529224032ed8) |
-| Staking Rewards Year 3-6       | [0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40](https://arbiscan.io/address/0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40) |
-| Staking Rewards Year 7 - 10    | [0x21d91cedf2cf162c87f14ce988a04c35737f7e0d](https://arbiscan.io/address/0x21d91cedf2cf162c87f14ce988a04c35737f7e0d) |
-| Treasury                       | [0x6a553c044a6a113b01be52372e8d7bc94594bbe8](https://arbiscan.io/address/0x6a553c044a6a113b01be52372e8d7bc94594bbe8) |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Modality                    | Vesting contract address                                                                                             |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Staking Rewards Year 1 - 2  | [0x03ed348892a88182e74d8e76e6f7529224032ed8](https://arbiscan.io/address/0x03ed348892a88182e74d8e76e6f7529224032ed8) |
+| Staking Rewards Year 3-6    | [0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40](https://arbiscan.io/address/0xd7740bf4fbd6f7633aec11e51f9b8d7dd6c0ae40) |
+| Staking Rewards Year 7 - 10 | [0x21d91cedf2cf162c87f14ce988a04c35737f7e0d](https://arbiscan.io/address/0x21d91cedf2cf162c87f14ce988a04c35737f7e0d) |
+| Treasury                    | [0x6a553c044a6a113b01be52372e8d7bc94594bbe8](https://arbiscan.io/address/0x6a553c044a6a113b01be52372e8d7bc94594bbe8) |
 
 These four contracts will be manually funded, and their transactions won't be
 tracked on TDEDisbursement.
