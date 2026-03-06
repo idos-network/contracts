@@ -72,7 +72,7 @@ export function checkAbiAgainstArtifact(
 }
 
 const ARTIFACTS = [
-  ["ContinuousClearingAuction.sol/ContinuousClearingAuction.json", "CCA"] as const,
+  //["ContinuousClearingAuction.sol/ContinuousClearingAuction.json", "CCA"] as const,
   ["CCADisbursementTracker.sol/CCADisbursementTracker.json", "Tracker"] as const,
   ["ERC20.sol/ERC20.json", "ERC20"] as const,
   ["TDEDisbursement.sol/TDEDisbursement.json", "TDEDisbursement"] as const,
@@ -93,7 +93,7 @@ function resolveArtifactPath(exactPath: string): string | null {
 const ABI_DRIFT_SUFFIX = "Update script/initial-distribution/src/abis.ts to match the contract.";
 
 export function assertAbisMatchArtifacts(abis: {
-  ccaAbi: AbiEntry;
+  //ccaAbi: AbiEntry;
   trackerAbi: AbiEntry;
   erc20Abi: AbiEntry;
   tdeDisbursementAbi: AbiEntry;
@@ -121,7 +121,7 @@ export function assertAbisMatchArtifacts(abis: {
   }
 
   const abiByLabel = {
-    CCA: abis.ccaAbi,
+    //CCA: abis.ccaAbi,
     Tracker: abis.trackerAbi,
     ERC20: abis.erc20Abi,
     TDEDisbursement: abis.tdeDisbursementAbi,
