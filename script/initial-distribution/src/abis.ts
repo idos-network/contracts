@@ -828,6 +828,19 @@ export const batchCallerAbi = [
     outputs: [],
     stateMutability: "nonpayable",
   },
+  {
+    type: "error",
+    name: "CallFailed",
+    inputs: [
+      { name: "index", type: "uint256", internalType: "uint256" },
+      { name: "returnData", type: "bytes", internalType: "bytes" },
+    ],
+  },
+  {
+    type: "error",
+    name: "OnlyCallableBySelf",
+    inputs: [],
+  },
 ] as const;
 
 export const erc20Abi = [
